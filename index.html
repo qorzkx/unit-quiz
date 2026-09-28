@@ -2555,7 +2555,8 @@ async function startMultiplayerGame() {
 
     waitingStartButton.disabled = true;
     try {
-        await saveWaitingSettings();
+        // 설정은 대기실에서 변경할 때 이미 저장되어 있다.
+        // 게임 시작 직전에 update_game_settings를 다시 호출하지 않는다.
         const pool = units.filter(u => selectedRaces.includes(u.race));
         if (pool.length < totalQuestions) {
             throw new Error(`선택한 종족의 유닛 수가 부족합니다. 현재 ${pool.length}개입니다.`);
@@ -2569,6 +2570,10 @@ async function startMultiplayerGame() {
             p_total_hints: totalHints
         });
         if (error) throw error;
+        waitingHintInterval.disabled = true;
+        waitingQuestionCount.disabled = true;
+        waitingRaceCheckboxes.forEach(cb => cb.disabled = true);
+        waitingStartButton.disabled = true;
     } catch (error) {
         setWaitingStatus(error.message || "게임 시작에 실패했습니다.", true);
         applyWaitingRoleUI();
