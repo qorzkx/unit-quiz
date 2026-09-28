@@ -2296,6 +2296,7 @@ async function subscribeWaitingRoom() {
         .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `room_id=eq.${currentRoomId}` }, async payload => {
             if (payload.new?.status === "playing") {
                 try {
+                    multiplayerCountdownStarted = false;
                     await beginMultiplayerGame(payload.new);
                 } catch (e) {
                     setWaitingStatus(e.message || "게임 시작 동기화에 실패했습니다.", true);
@@ -2306,7 +2307,7 @@ async function subscribeWaitingRoom() {
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "rooms", filter: `id=eq.${currentRoomId}` }, async payload => {
             if (payload.new?.status === "playing") {
-                try { await beginMultiplayerGame(); } catch (_) {}
+                try { multiplayerCountdownStarted = false; await beginMultiplayerGame(); } catch (_) {}
             }
         })
         .subscribe();
@@ -2338,12 +2339,16 @@ async function subscribeMultiplayerGame(gameId) {
         .subscribe();
 }
 
+let multiplayerCountdownStarted = false;
+
 async function beginMultiplayerGame(gamePayload = null) {
     if (!currentRoomId) return;
     multiplayerMode = true;
-    waitingRoomOverlay.classList.add("hidden");
-    lobbyOverlay.classList.add("hidden");
+
+    // 멀티플레이에서는 기존 싱글플레이 시작 화면/버튼을 절대 사용하지 않는다.
     startOverlay.classList.add("hidden");
+    startButton.style.display = "none";
+    lobbyOverlay.classList.add("hidden");
 
     let game = gamePayload;
     if (!game || !game.id) {
@@ -2370,7 +2375,38 @@ async function beginMultiplayerGame(gamePayload = null) {
         .eq("question_number", game.current_question || 1)
         .single();
     if (qError) throw qError;
+
+    // 양쪽 모두 서버의 question_started_at을 기준으로 동일한 카운트다운을 본다.
+    if (!multiplayerCountdownStarted) {
+        multiplayerCountdownStarted = true;
+        await runMultiplayerCountdown(game.question_started_at);
+    }
+
     await handleMultiplayerQuestionChange(q);
+}
+
+async function runMultiplayerCountdown(startedAt) {
+    const target = Date.parse(startedAt || "");
+    if (!Number.isFinite(target)) return;
+
+    // start_game 직후부터 3초 카운트다운을 표시한다.
+    // 이미 시간이 지나 들어온 플레이어는 남은 시간만 표시한다.
+    const countdownStart = target - 3000;
+    let remaining = countdownStart - Date.now();
+    if (remaining <= 0) return;
+
+    stopTimers();
+    countdownOverlay.classList.add("active");
+    startOverlay.classList.add("hidden");
+
+    while (Date.now() < target) {
+        const ms = target - Date.now();
+        const value = Math.max(1, Math.ceil(ms / 1000));
+        bigCountdown.textContent = String(value);
+        await new Promise(resolve => setTimeout(resolve, Math.min(100, ms)));
+    }
+
+    countdownOverlay.classList.remove("active");
 }
 
 async function handleMultiplayerQuestionChange(q) {
@@ -2477,6 +2513,7 @@ async function enterWaitingRoom() {
         .eq("room_id", currentRoomId)
         .maybeSingle();
     if (existingGame?.status === "playing") {
+        multiplayerCountdownStarted = false;
         await beginMultiplayerGame(existingGame);
     }
 }
@@ -2566,6 +2603,10 @@ const settingsModalBackdrop = document.getElementById("settingsModalBackdrop");
 const closeSettingsButton = document.getElementById("closeSettingsButton");
 const startOverlay = document.getElementById("startOverlay");
 const startButton = document.getElementById("startButton");
+
+// 이 버전은 멀티플레이 전용이므로 기존 싱글플레이 시작 UI는 항상 숨긴다.
+startButton.style.display = "none";
+startOverlay.classList.add("hidden");
 const countdownOverlay = document.getElementById("countdownOverlay");
 const bigCountdown = document.getElementById("bigCountdown");
 const hintTimeValue = document.getElementById("hintTimeValue");
@@ -2708,6 +2749,8 @@ function startTimers(remainingMs = hintIntervalMs) {
 }
 
 function runInitialCountdown() {
+    // 멀티플레이는 방장의 start_game RPC와 서버 상태 동기화만 사용한다.
+    if (multiplayerMode) return;
     if (gameStarted) return;
     startButton.disabled = true;
     countdownOverlay.classList.add("active");
