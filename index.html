@@ -2340,6 +2340,7 @@ async function subscribeMultiplayerGame(gameId) {
 }
 
 let multiplayerCountdownStarted = false;
+let multiplayerInitialStartAt = null;
 
 async function beginMultiplayerGame(gamePayload = null) {
     if (!currentRoomId) return;
@@ -2349,6 +2350,8 @@ async function beginMultiplayerGame(gamePayload = null) {
     startOverlay.classList.add("hidden");
     startButton.style.display = "none";
     lobbyOverlay.classList.add("hidden");
+    // 게임이 시작되면 양쪽 모두 대기실을 즉시 닫는다.
+    waitingRoomOverlay.classList.add("hidden");
 
     let game = gamePayload;
     if (!game || !game.id) {
@@ -2376,10 +2379,13 @@ async function beginMultiplayerGame(gamePayload = null) {
         .single();
     if (qError) throw qError;
 
-    // 양쪽 모두 서버의 question_started_at을 기준으로 동일한 카운트다운을 본다.
-    if (!multiplayerCountdownStarted) {
+    // start_game의 question_started_at은 현재 시각이므로, 그 값을 공통 기준점으로 삼아
+    // 양쪽 클라이언트가 동일한 3-2-1 시작 시각을 계산한다.
+    // DB에 별도 카운트다운 필드를 추가하지 않고도 같은 절대시각을 공유한다.
+    if (!multiplayerCountdownStarted && Number(q.question_number) === 1) {
         multiplayerCountdownStarted = true;
-        await runMultiplayerCountdown(game.question_started_at);
+        multiplayerInitialStartAt = new Date(Date.parse(game.question_started_at) + 3000).toISOString();
+        await runMultiplayerCountdown(multiplayerInitialStartAt);
     }
 
     await handleMultiplayerQuestionChange(q);
@@ -2389,23 +2395,30 @@ async function runMultiplayerCountdown(startedAt) {
     const target = Date.parse(startedAt || "");
     if (!Number.isFinite(target)) return;
 
-    // start_game 직후부터 3초 카운트다운을 표시한다.
-    // 이미 시간이 지나 들어온 플레이어는 남은 시간만 표시한다.
+    // 양쪽 클라이언트가 같은 절대시각을 사용한다.
+    // 네트워크 지연으로 함수를 조금 늦게 호출해도 남은 카운트만 표시한다.
     const countdownStart = target - 3000;
-    let remaining = countdownStart - Date.now();
-    if (remaining <= 0) return;
+    if (Date.now() >= target) return;
+
+    if (Date.now() < countdownStart) {
+        await new Promise(resolve => setTimeout(resolve, countdownStart - Date.now()));
+    }
+
+    if (Date.now() >= target) return;
 
     stopTimers();
     countdownOverlay.classList.add("active");
     startOverlay.classList.add("hidden");
+    waitingRoomOverlay.classList.add("hidden");
 
     while (Date.now() < target) {
         const ms = target - Date.now();
-        const value = Math.max(1, Math.ceil(ms / 1000));
+        const value = Math.min(3, Math.max(1, Math.ceil(ms / 1000)));
         bigCountdown.textContent = String(value);
-        await new Promise(resolve => setTimeout(resolve, Math.min(100, ms)));
+        await new Promise(resolve => setTimeout(resolve, Math.min(50, ms)));
     }
 
+    bigCountdown.textContent = "1";
     countdownOverlay.classList.remove("active");
 }
 
@@ -2425,7 +2438,11 @@ async function handleMultiplayerQuestionChange(q) {
         if (game.error) throw game.error;
         hintIntervalMs = Number(game.data.hint_interval_ms) || hintIntervalMs;
         multiplayerQuestionStartedAt = game.data.question_started_at;
-        startMultiplayerQuestion(currentUnit, multiplayerQuestionStartedAt, q.revealed_hints || 0);
+        // 첫 문제만 위에서 정한 공통 카운트다운 시각을 사용한다.
+        const effectiveStartAt = (Number(q.question_number) === 1 && multiplayerInitialStartAt)
+            ? multiplayerInitialStartAt
+            : multiplayerQuestionStartedAt;
+        startMultiplayerQuestion(currentUnit, effectiveStartAt, q.revealed_hints || 0);
         return;
     }
 
