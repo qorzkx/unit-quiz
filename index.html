@@ -2016,6 +2016,7 @@ let currentRoomCode = null;
 let currentRoomIsHost = false;
 let waitingRoomChannel = null;
 let waitingRoomPlayers = [];
+let roomHostIdForUi = null;
 let waitingRoomSettingsTimer = null;
 
 const waitingRoomOverlay = document.getElementById("waitingRoomOverlay");
@@ -2124,6 +2125,7 @@ async function loadWaitingRoomState() {
         .single();
     if (roomError) throw roomError;
 
+    roomHostIdForUi = room.host_id;
     currentRoomIsHost = room.host_id === currentLobbyUser.id;
     waitingRoomCode.textContent = room.room_code;
 
@@ -2174,8 +2176,20 @@ function applyWaitingRoleUI() {
     waitingReadyButton.style.display = currentRoomIsHost ? "none" : "block";
     waitingSettingsNote.textContent = currentRoomIsHost ? "방장만 게임 설정을 변경할 수 있습니다." : "게임 설정은 방장이 결정합니다. READY를 눌러 참가 준비를 완료하세요.";
 
-    const allReady = waitingRoomPlayers.length > 0 && waitingRoomPlayers.every(p => p.user_id === currentLobbyUser.id || p.is_ready);
-    waitingStartButton.disabled = !currentRoomIsHost || !allReady;
+    // 방장은 자동 READY이며, 방장 혼자 있는 방도 바로 시작할 수 있다.
+    // 다른 플레이어가 있을 때만 비방장 전원의 READY를 요구한다.
+    const nonHostPlayers = waitingRoomPlayers.filter(p => p.user_id !== roomHostIdForUi);
+    const allNonHostsReady = nonHostPlayers.every(p => p.is_ready);
+    const canStart = currentRoomIsHost && allNonHostsReady;
+    waitingStartButton.disabled = !canStart;
+
+    if (currentRoomIsHost) {
+        if (nonHostPlayers.length === 0) {
+            setWaitingStatus("방장만 있는 상태입니다. 바로 게임을 시작할 수 있습니다.");
+        } else if (allNonHostsReady) {
+            setWaitingStatus("모든 참가자가 READY했습니다. 게임을 시작할 수 있습니다.");
+        }
+    }
 }
 
 async function saveWaitingSettings() {
