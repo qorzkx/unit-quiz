@@ -435,6 +435,50 @@ body {
 .room-code-display { margin-top: 10px; padding: 12px; text-align: center; border: 1px solid #355267; border-radius: 8px; background: #0b151d; }
 .room-code-display strong { display: block; margin-top: 4px; font-size: 25px; letter-spacing: 3px; color: #dcecff; }
 
+
+/* 멀티플레이 대기실 */
+#waitingRoomOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 450;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #071018;
+    padding: 20px;
+}
+#waitingRoomOverlay.hidden { display: none; }
+.waiting-card {
+    width: min(760px, 94vw);
+    max-height: 90vh;
+    overflow: auto;
+    padding: 24px;
+    background: #101d27;
+    border: 1px solid #294252;
+    border-radius: 14px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.45);
+}
+.waiting-header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+.waiting-header h2 { margin:0; }
+.waiting-room-code { color:#dcecff; font-size:18px; letter-spacing:2px; }
+.waiting-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.waiting-section { padding:16px; background:#0b151d; border:1px solid #294252; border-radius:10px; }
+.waiting-section h3 { margin:0 0 12px; font-size:16px; }
+.waiting-players { display:grid; gap:8px; }
+.waiting-player { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 10px; background:#101d27; border:1px solid #203746; border-radius:8px; }
+.waiting-player.host { border-color:#8aa9bf; }
+.waiting-player-name { font-weight:600; }
+.waiting-player-state { font-size:12px; color:#9bb2c3; }
+.waiting-settings { display:grid; gap:12px; }
+.waiting-settings label { display:block; margin-bottom:5px; color:#9bb2c3; font-size:13px; }
+.waiting-settings input[type=number], .waiting-settings select { width:100%; box-sizing:border-box; padding:9px; border-radius:7px; border:1px solid #355267; background:#071018; color:#e8f1f8; }
+.waiting-races { display:flex; flex-wrap:wrap; gap:8px; }
+.waiting-races label { margin:0; display:flex; align-items:center; gap:5px; padding:7px 9px; border:1px solid #355267; border-radius:7px; }
+.waiting-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+.waiting-actions button { flex:1; min-width:150px; }
+.waiting-note { margin-top:10px; color:#7893a8; font-size:12px; line-height:1.5; }
+@media (max-width:700px) { .waiting-grid { grid-template-columns:1fr; } }
+
 /* 시작 화면 / 3-2-1 */
 #startOverlay {
     position: fixed;
@@ -881,6 +925,54 @@ button:disabled {
         </div>
 
         <div id="lobbyStatus" class="lobby-status"></div>
+    </div>
+</div>
+
+<div id="waitingRoomOverlay" class="hidden">
+    <div class="waiting-card">
+        <div class="waiting-header">
+            <div>
+                <h2>게임 대기실</h2>
+                <div class="waiting-room-code">방 코드: <strong id="waitingRoomCode"></strong></div>
+            </div>
+            <button id="waitingCodexButton" type="button">도감</button>
+        </div>
+
+        <div class="waiting-grid">
+            <section class="waiting-section">
+                <h3>참가자</h3>
+                <div id="waitingPlayers" class="waiting-players"></div>
+            </section>
+
+            <section class="waiting-section">
+                <h3>게임 설정</h3>
+                <div class="waiting-settings">
+                    <div>
+                        <label for="waitingHintInterval">힌트 공개 간격</label>
+                        <select id="waitingHintInterval"></select>
+                    </div>
+                    <div>
+                        <label for="waitingQuestionCount">문제 수</label>
+                        <input id="waitingQuestionCount" type="number" min="5" max="50" step="1" value="5">
+                    </div>
+                    <div>
+                        <label>출제 종족</label>
+                        <div class="waiting-races">
+                            <label><input type="checkbox" class="waitingRace" value="테란" checked> 테란</label>
+                            <label><input type="checkbox" class="waitingRace" value="저그" checked> 저그</label>
+                            <label><input type="checkbox" class="waitingRace" value="프로토스" checked> 프로토스</label>
+                        </div>
+                    </div>
+                </div>
+                <div id="waitingSettingsNote" class="waiting-note"></div>
+            </section>
+        </div>
+
+        <div class="waiting-actions">
+            <button id="waitingReadyButton" type="button">READY</button>
+            <button id="waitingStartButton" type="button" disabled>게임 시작</button>
+        </div>
+        <div id="waitingStatus" class="lobby-status"></div>
     </div>
 </div>
 
@@ -1884,6 +1976,27 @@ const lobbyStatus = document.getElementById("lobbyStatus");
 let currentLobbyUser = null;
 let currentRoomId = null;
 let currentRoomCode = null;
+let currentRoomIsHost = false;
+let waitingRoomChannel = null;
+let waitingRoomPlayers = [];
+let waitingRoomSettingsTimer = null;
+
+const waitingRoomOverlay = document.getElementById("waitingRoomOverlay");
+const waitingRoomCode = document.getElementById("waitingRoomCode");
+const waitingPlayers = document.getElementById("waitingPlayers");
+const waitingHintInterval = document.getElementById("waitingHintInterval");
+const waitingQuestionCount = document.getElementById("waitingQuestionCount");
+const waitingReadyButton = document.getElementById("waitingReadyButton");
+const waitingStartButton = document.getElementById("waitingStartButton");
+const waitingStatus = document.getElementById("waitingStatus");
+const waitingSettingsNote = document.getElementById("waitingSettingsNote");
+const waitingCodexButton = document.getElementById("waitingCodexButton");
+const waitingRaceCheckboxes = [...document.querySelectorAll(".waitingRace")];
+
+function setWaitingStatus(message, isError = false) {
+    waitingStatus.textContent = message;
+    waitingStatus.style.color = isError ? "#df7777" : "#9bb2c3";
+}
 
 function setLobbyStatus(message, isError = false) {
     lobbyStatus.textContent = message;
@@ -1916,11 +2029,7 @@ async function joinRoomFromLobby() {
         if (error) throw error;
         currentRoomId = data.room_id;
         currentRoomCode = roomCode;
-        setLobbyStatus("방 참가 완료. 게임을 시작합니다.");
-        setTimeout(() => {
-            lobbyOverlay.classList.add("hidden");
-            startOverlay.classList.remove("hidden");
-        }, 250);
+        await enterWaitingRoom();
     } catch (error) {
         setLobbyStatus(error.message || "방 참가에 실패했습니다.", true);
     } finally {
@@ -1949,23 +2058,212 @@ async function loginAdmin() {
 }
 
 async function createRoomFromLobby() {
+    const nickname = lobbyNickname.value.trim();
+    if (!nickname) { setLobbyStatus("방을 만들기 전에 닉네임을 입력해주세요.", true); return; }
+
     createRoomButton.disabled = true;
     setLobbyStatus("방을 만드는 중...");
     try {
-        const { data, error } = await supabaseClient.rpc("create_room");
+        const { data, error } = await supabaseClient.rpc("create_room_with_nickname", { p_nickname: nickname });
         if (error) throw error;
         currentRoomId = data.room_id;
         currentRoomCode = data.room_code;
         lobbyRoomCode.value = data.room_code;
         createdRoomCode.textContent = data.room_code;
         roomCodeDisplay.style.display = "block";
-        setLobbyStatus("방 생성 완료. 이 코드를 친구들에게 알려주세요.");
+        await enterWaitingRoom();
     } catch (error) {
         setLobbyStatus(error.message || "방 생성에 실패했습니다.", true);
     } finally {
         createRoomButton.disabled = false;
     }
 }
+
+async function loadWaitingRoomState() {
+    const { data: room, error: roomError } = await supabaseClient
+        .from("rooms")
+        .select("id, room_code, host_id, status")
+        .eq("id", currentRoomId)
+        .single();
+    if (roomError) throw roomError;
+
+    currentRoomIsHost = room.host_id === currentLobbyUser.id;
+    waitingRoomCode.textContent = room.room_code;
+
+    const { data: players, error: playerError } = await supabaseClient
+        .from("room_players")
+        .select("user_id, nickname, is_ready, score")
+        .eq("room_id", currentRoomId)
+        .order("joined_at", { ascending: true });
+    if (playerError) throw playerError;
+    waitingRoomPlayers = players || [];
+    renderWaitingPlayers();
+
+    const { data: game } = await supabaseClient
+        .from("games")
+        .select("total_questions, hint_interval_ms, selected_races, status")
+        .eq("room_id", currentRoomId)
+        .maybeSingle();
+
+    if (game) {
+        waitingQuestionCount.value = game.total_questions;
+        waitingHintInterval.value = String(game.hint_interval_ms);
+        waitingRaceCheckboxes.forEach(cb => cb.checked = (game.selected_races || []).includes(cb.value));
+    }
+
+    applyWaitingRoleUI();
+}
+
+function renderWaitingPlayers() {
+    waitingPlayers.innerHTML = "";
+    for (const player of waitingRoomPlayers) {
+        const row = document.createElement("div");
+        row.className = "waiting-player" + (player.user_id === currentLobbyUser?.id ? " host" : "");
+        const name = document.createElement("span");
+        name.className = "waiting-player-name";
+        name.textContent = player.nickname + (player.user_id === currentLobbyUser?.id ? " (나)" : "");
+        const state = document.createElement("span");
+        state.className = "waiting-player-state";
+        state.textContent = player.user_id === currentLobbyUser?.id && currentRoomIsHost ? "방장 · READY" : (player.is_ready ? "READY" : "대기 중");
+        row.append(name, state);
+        waitingPlayers.appendChild(row);
+    }
+}
+
+function applyWaitingRoleUI() {
+    waitingHintInterval.disabled = !currentRoomIsHost;
+    waitingQuestionCount.disabled = !currentRoomIsHost;
+    waitingRaceCheckboxes.forEach(cb => cb.disabled = !currentRoomIsHost);
+    waitingReadyButton.style.display = currentRoomIsHost ? "none" : "block";
+    waitingSettingsNote.textContent = currentRoomIsHost ? "방장만 게임 설정을 변경할 수 있습니다." : "게임 설정은 방장이 결정합니다. READY를 눌러 참가 준비를 완료하세요.";
+
+    const allReady = waitingRoomPlayers.length > 0 && waitingRoomPlayers.every(p => p.user_id === currentLobbyUser.id || p.is_ready);
+    waitingStartButton.disabled = !currentRoomIsHost || !allReady;
+}
+
+async function saveWaitingSettings() {
+    if (!currentRoomIsHost || !currentRoomId) return;
+    const selectedRaces = waitingRaceCheckboxes.filter(cb => cb.checked).map(cb => cb.value);
+    if (selectedRaces.length < 1 || selectedRaces.length > 3) {
+        setWaitingStatus("출제 종족은 1~3개를 선택해주세요.", true);
+        return;
+    }
+    const totalQuestions = Math.max(5, Math.min(50, Number(waitingQuestionCount.value) || 5));
+    const hintIntervalMs = Number(waitingHintInterval.value);
+    waitingQuestionCount.value = totalQuestions;
+    try {
+        const { error } = await supabaseClient.rpc("update_game_settings", {
+            p_room_id: currentRoomId,
+            p_total_questions: totalQuestions,
+            p_hint_interval_ms: hintIntervalMs,
+            p_selected_races: selectedRaces
+        });
+        if (error) throw error;
+        setWaitingStatus("게임 설정이 저장되었습니다.");
+    } catch (error) {
+        setWaitingStatus(error.message || "게임 설정 저장에 실패했습니다.", true);
+    }
+}
+
+async function toggleReady() {
+    if (currentRoomIsHost) return;
+    const me = waitingRoomPlayers.find(p => p.user_id === currentLobbyUser.id);
+    const nextReady = !(me?.is_ready);
+    waitingReadyButton.disabled = true;
+    try {
+        const { error } = await supabaseClient.rpc("set_ready", { p_room_id: currentRoomId, p_ready: nextReady });
+        if (error) throw error;
+        setWaitingStatus(nextReady ? "READY 완료" : "READY를 취소했습니다.");
+        await loadWaitingRoomState();
+    } catch (error) {
+        setWaitingStatus(error.message || "READY 변경에 실패했습니다.", true);
+    } finally {
+        waitingReadyButton.disabled = false;
+    }
+}
+
+function fillHintIntervalOptions() {
+    if (waitingHintInterval.options.length) return;
+    for (let i = 1; i <= 20; i++) {
+        const ms = i * 500;
+        const option = document.createElement("option");
+        option.value = String(ms);
+        option.textContent = `${(ms / 1000).toFixed(1)}초`;
+        waitingHintInterval.appendChild(option);
+    }
+    waitingHintInterval.value = "5000";
+}
+
+async function subscribeWaitingRoom() {
+    if (waitingRoomChannel) await supabaseClient.removeChannel(waitingRoomChannel);
+    waitingRoomChannel = supabaseClient
+        .channel(`room-${currentRoomId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "room_players", filter: `room_id=eq.${currentRoomId}` }, async () => {
+            try { await loadWaitingRoomState(); } catch (e) { setWaitingStatus(e.message || "대기실 갱신 실패", true); }
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `room_id=eq.${currentRoomId}` }, async payload => {
+            if (payload.new?.status === "playing") {
+                waitingRoomOverlay.classList.add("hidden");
+                startOverlay.classList.remove("hidden");
+            } else {
+                try { await loadWaitingRoomState(); } catch (_) {}
+            }
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "rooms", filter: `id=eq.${currentRoomId}` }, async payload => {
+            if (payload.new?.status === "playing") {
+                waitingRoomOverlay.classList.add("hidden");
+                startOverlay.classList.remove("hidden");
+            }
+        })
+        .subscribe();
+}
+
+async function enterWaitingRoom() {
+    await ensureAnonymousSession();
+    lobbyOverlay.classList.add("hidden");
+    startOverlay.classList.add("hidden");
+    waitingRoomOverlay.classList.remove("hidden");
+    fillHintIntervalOptions();
+    await loadWaitingRoomState();
+    await subscribeWaitingRoom();
+}
+
+async function startMultiplayerGame() {
+    if (!currentRoomIsHost) return;
+    const selectedRaces = waitingRaceCheckboxes.filter(cb => cb.checked).map(cb => cb.value);
+    const totalQuestions = Math.max(5, Math.min(50, Number(waitingQuestionCount.value) || 5));
+    const hintIntervalMs = Number(waitingHintInterval.value);
+    if (!selectedRaces.length) { setWaitingStatus("종족을 하나 이상 선택해주세요.", true); return; }
+
+    waitingStartButton.disabled = true;
+    try {
+        await saveWaitingSettings();
+        const pool = units.filter(u => selectedRaces.includes(u.race));
+        if (pool.length < totalQuestions) {
+            throw new Error(`선택한 종족의 유닛 수가 부족합니다. 현재 ${pool.length}개입니다.`);
+        }
+        const shuffled = shuffle([...pool]);
+        const questionUnits = shuffled.slice(0, totalQuestions).map(u => u.name);
+        const totalHints = shuffled.slice(0, totalQuestions).map(u => buildHints(u).length);
+        const { error } = await supabaseClient.rpc("start_game", {
+            p_room_id: currentRoomId,
+            p_question_units: questionUnits,
+            p_total_hints: totalHints
+        });
+        if (error) throw error;
+    } catch (error) {
+        setWaitingStatus(error.message || "게임 시작에 실패했습니다.", true);
+        applyWaitingRoleUI();
+    }
+}
+
+fillHintIntervalOptions();
+waitingReadyButton.addEventListener("click", toggleReady);
+waitingStartButton.addEventListener("click", startMultiplayerGame);
+waitingHintInterval.addEventListener("change", saveWaitingSettings);
+waitingQuestionCount.addEventListener("change", saveWaitingSettings);
+waitingRaceCheckboxes.forEach(cb => cb.addEventListener("change", saveWaitingSettings));
+waitingCodexButton.addEventListener("click", openCodexOverlay);
 
 joinRoomButton.addEventListener("click", joinRoomFromLobby);
 showAdminLoginButton.addEventListener("click", () => {
