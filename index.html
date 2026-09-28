@@ -460,7 +460,26 @@ body {
 }
 .waiting-header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
 .waiting-header h2 { margin:0; }
-.waiting-room-code { color:#dcecff; font-size:18px; letter-spacing:2px; }
+.waiting-room-code {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:10px;
+    padding:10px 14px;
+    background:#071018;
+    border:1px solid #46647a;
+    border-radius:8px;
+    color:#9bb2c3;
+    font-size:13px;
+    letter-spacing:0;
+}
+.waiting-room-code strong {
+    color:#ffffff;
+    font-size:24px;
+    line-height:1;
+    letter-spacing:4px;
+    font-weight:800;
+}
 .waiting-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .waiting-section { padding:16px; background:#0b151d; border:1px solid #294252; border-radius:10px; }
 .waiting-section h3 { margin:0 0 12px; font-size:16px; }
@@ -471,7 +490,25 @@ body {
 .waiting-player-state { font-size:12px; color:#9bb2c3; }
 .waiting-settings { display:grid; gap:12px; }
 .waiting-settings label { display:block; margin-bottom:5px; color:#9bb2c3; font-size:13px; }
-.waiting-settings input[type=number], .waiting-settings select { width:100%; box-sizing:border-box; padding:9px; border-radius:7px; border:1px solid #355267; background:#071018; color:#e8f1f8; }
+.waiting-settings input[type=number], .waiting-settings select {
+    width:100%;
+    box-sizing:border-box;
+    padding:9px;
+    border-radius:7px;
+    border:1px solid #355267;
+    background:#071018;
+    color:#e8f1f8;
+    font-size:15px;
+}
+.waiting-settings input[type=number] {
+    appearance:auto;
+    -moz-appearance:textfield;
+}
+.waiting-settings input[type=number]::-webkit-inner-spin-button,
+.waiting-settings input[type=number]::-webkit-outer-spin-button {
+    opacity:1;
+    height:30px;
+}
 .waiting-races { display:flex; flex-wrap:wrap; gap:8px; }
 .waiting-races label { margin:0; display:flex; align-items:center; gap:5px; padding:7px 9px; border:1px solid #355267; border-radius:7px; }
 .waiting-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
@@ -949,7 +986,7 @@ button:disabled {
                 <div class="waiting-settings">
                     <div>
                         <label for="waitingHintInterval">힌트 공개 간격</label>
-                        <select id="waitingHintInterval"></select>
+                        <input id="waitingHintInterval" type="number" min="0.5" max="10" step="0.5" value="5" inputmode="decimal">
                     </div>
                     <div>
                         <label for="waitingQuestionCount">문제 수</label>
@@ -2107,7 +2144,7 @@ async function loadWaitingRoomState() {
 
     if (game) {
         waitingQuestionCount.value = game.total_questions;
-        waitingHintInterval.value = String(game.hint_interval_ms);
+        waitingHintInterval.value = (Number(game.hint_interval_ms) / 1000).toFixed(1);
         waitingRaceCheckboxes.forEach(cb => cb.checked = (game.selected_races || []).includes(cb.value));
     }
 
@@ -2149,7 +2186,7 @@ async function saveWaitingSettings() {
         return;
     }
     const totalQuestions = Math.max(5, Math.min(50, Number(waitingQuestionCount.value) || 5));
-    const hintIntervalMs = Number(waitingHintInterval.value);
+    const hintIntervalMs = syncWaitingHintInterval();
     waitingQuestionCount.value = totalQuestions;
     try {
         const { error } = await supabaseClient.rpc("update_game_settings", {
@@ -2182,16 +2219,17 @@ async function toggleReady() {
     }
 }
 
-function fillHintIntervalOptions() {
-    if (waitingHintInterval.options.length) return;
-    for (let i = 1; i <= 20; i++) {
-        const ms = i * 500;
-        const option = document.createElement("option");
-        option.value = String(ms);
-        option.textContent = `${(ms / 1000).toFixed(1)}초`;
-        waitingHintInterval.appendChild(option);
-    }
-    waitingHintInterval.value = "5000";
+function normalizeWaitingHintInterval(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 5;
+    const clamped = Math.min(10, Math.max(0.5, number));
+    return Math.round(clamped * 2) / 2;
+}
+
+function syncWaitingHintInterval() {
+    const seconds = normalizeWaitingHintInterval(waitingHintInterval.value);
+    waitingHintInterval.value = seconds.toFixed(1);
+    return Math.round(seconds * 1000);
 }
 
 async function subscribeWaitingRoom() {
@@ -2223,7 +2261,7 @@ async function enterWaitingRoom() {
     lobbyOverlay.classList.add("hidden");
     startOverlay.classList.add("hidden");
     waitingRoomOverlay.classList.remove("hidden");
-    fillHintIntervalOptions();
+    syncWaitingHintInterval();
     await loadWaitingRoomState();
     await subscribeWaitingRoom();
 }
@@ -2232,7 +2270,7 @@ async function startMultiplayerGame() {
     if (!currentRoomIsHost) return;
     const selectedRaces = waitingRaceCheckboxes.filter(cb => cb.checked).map(cb => cb.value);
     const totalQuestions = Math.max(5, Math.min(50, Number(waitingQuestionCount.value) || 5));
-    const hintIntervalMs = Number(waitingHintInterval.value);
+    const hintIntervalMs = syncWaitingHintInterval();
     if (!selectedRaces.length) { setWaitingStatus("종족을 하나 이상 선택해주세요.", true); return; }
 
     waitingStartButton.disabled = true;
@@ -2257,10 +2295,11 @@ async function startMultiplayerGame() {
     }
 }
 
-fillHintIntervalOptions();
+syncWaitingHintInterval();
+waitingHintInterval.addEventListener("input", () => { syncWaitingHintInterval(); });
+waitingHintInterval.addEventListener("change", saveWaitingSettings);
 waitingReadyButton.addEventListener("click", toggleReady);
 waitingStartButton.addEventListener("click", startMultiplayerGame);
-waitingHintInterval.addEventListener("change", saveWaitingSettings);
 waitingQuestionCount.addEventListener("change", saveWaitingSettings);
 waitingRaceCheckboxes.forEach(cb => cb.addEventListener("change", saveWaitingSettings));
 waitingCodexButton.addEventListener("click", openCodexOverlay);
