@@ -1021,7 +1021,7 @@ button:disabled {
     <div class="start-card">
         <h2>StarCraft Unit Quiz</h2>
         <p>힌트를 보고 유닛을 맞혀라</p>
-        <button id="startButton">게임 시작</button>
+        <button id="startButton" style="display:none;">게임 시작</button>
     </div>
 </div>
 
@@ -1990,6 +1990,13 @@ let gameStarted = false;
 let settingsOpen = false;
 let pausedRemainingMs = null;
 
+// 멀티플레이 게임 상태
+let multiplayerGameId = null;
+let multiplayerGameChannel = null;
+let multiplayerGameQuestionId = null;
+let multiplayerQuestionStartedAt = null;
+let multiplayerMode = true;
+
 
 /* =========================================================
    DOM
@@ -2044,6 +2051,31 @@ function setWaitingStatus(message, isError = false) {
 function setLobbyStatus(message, isError = false) {
     lobbyStatus.textContent = message;
     lobbyStatus.style.color = isError ? "#df7777" : "#9bb2c3";
+}
+
+function findUnitByName(name) {
+    const normalizedName = normalize(name || "");
+    return units.find(unit =>
+        normalize(unit.name) === normalizedName ||
+        (unit.aliases || []).some(alias => normalize(alias) === normalizedName)
+    ) || null;
+}
+
+function seededShuffle(array, seedText) {
+    const result = [...array];
+    let seed = 0;
+    for (let i = 0; i < seedText.length; i++) {
+        seed = ((seed << 5) - seed + seedText.charCodeAt(i)) | 0;
+    }
+    const random = () => {
+        seed = (seed * 1664525 + 1013904223) | 0;
+        return ((seed >>> 0) / 4294967296);
+    };
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
 }
 
 async function ensureAnonymousSession() {
@@ -2263,19 +2295,171 @@ async function subscribeWaitingRoom() {
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `room_id=eq.${currentRoomId}` }, async payload => {
             if (payload.new?.status === "playing") {
-                waitingRoomOverlay.classList.add("hidden");
-                startOverlay.classList.remove("hidden");
+                try {
+                    await beginMultiplayerGame(payload.new);
+                } catch (e) {
+                    setWaitingStatus(e.message || "게임 시작 동기화에 실패했습니다.", true);
+                }
             } else {
                 try { await loadWaitingRoomState(); } catch (_) {}
             }
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "rooms", filter: `id=eq.${currentRoomId}` }, async payload => {
             if (payload.new?.status === "playing") {
-                waitingRoomOverlay.classList.add("hidden");
-                startOverlay.classList.remove("hidden");
+                try { await beginMultiplayerGame(); } catch (_) {}
             }
         })
         .subscribe();
+}
+
+async function subscribeMultiplayerGame(gameId) {
+    if (multiplayerGameChannel) {
+        await supabaseClient.removeChannel(multiplayerGameChannel);
+    }
+    multiplayerGameId = gameId;
+    multiplayerGameChannel = supabaseClient
+        .channel(`game-${gameId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "game_questions", filter: `game_id=eq.${gameId}` }, async payload => {
+            try {
+                await handleMultiplayerQuestionChange(payload.new);
+            } catch (e) {
+                resultElement.textContent = e.message || "문제 동기화에 실패했습니다.";
+                resultElement.style.color = "#df7777";
+            }
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "room_players", filter: `room_id=eq.${currentRoomId}` }, async payload => {
+            const me = payload.new?.user_id === currentLobbyUser?.id ? payload.new : null;
+            if (me && typeof me.score === "number") {
+                score = me.score;
+                scoreElement.textContent = score;
+            }
+            try { await loadWaitingRoomState(); } catch (_) {}
+        })
+        .subscribe();
+}
+
+async function beginMultiplayerGame(gamePayload = null) {
+    if (!currentRoomId) return;
+    multiplayerMode = true;
+    waitingRoomOverlay.classList.add("hidden");
+    lobbyOverlay.classList.add("hidden");
+    startOverlay.classList.add("hidden");
+
+    let game = gamePayload;
+    if (!game || !game.id) {
+        const { data, error } = await supabaseClient
+            .from("games")
+            .select("id, status, current_question, total_questions, hint_interval_ms, question_started_at")
+            .eq("room_id", currentRoomId)
+            .single();
+        if (error) throw error;
+        game = data;
+    }
+    if (game.status !== "playing") return;
+
+    hintIntervalMs = Number(game.hint_interval_ms) || hintIntervalMs;
+    setHintInterval(hintIntervalMs / 1000, false);
+    multiplayerGameId = game.id;
+    multiplayerQuestionStartedAt = game.question_started_at;
+    await subscribeMultiplayerGame(game.id);
+
+    const { data: q, error: qError } = await supabaseClient
+        .from("game_questions")
+        .select("id, question_number, unit_name, status, total_hints, revealed_hints, answered_by, answered_at")
+        .eq("game_id", game.id)
+        .eq("question_number", game.current_question || 1)
+        .single();
+    if (qError) throw qError;
+    await handleMultiplayerQuestionChange(q);
+}
+
+async function handleMultiplayerQuestionChange(q) {
+    if (!q || !q.id || q.status === "waiting") return;
+    multiplayerGameQuestionId = q.id;
+    questionNumber = Number(q.question_number) || 1;
+    currentUnit = findUnitByName(q.unit_name);
+    if (!currentUnit) throw new Error(`유닛 데이터를 찾을 수 없습니다: ${q.unit_name}`);
+
+    if (q.status === "active") {
+        const game = await supabaseClient
+            .from("games")
+            .select("hint_interval_ms, question_started_at")
+            .eq("id", multiplayerGameId)
+            .single();
+        if (game.error) throw game.error;
+        hintIntervalMs = Number(game.data.hint_interval_ms) || hintIntervalMs;
+        multiplayerQuestionStartedAt = game.data.question_started_at;
+        startMultiplayerQuestion(currentUnit, multiplayerQuestionStartedAt, q.revealed_hints || 0);
+        return;
+    }
+
+    if (q.status === "answered" || q.status === "expired") {
+        stopTimers();
+        if (answerRevealTimer) clearTimeout(answerRevealTimer);
+        answered = true;
+        answerInput.disabled = true;
+        submitButton.disabled = true;
+        nextButton.style.display = currentRoomIsHost ? "block" : "none";
+        if (q.status === "answered") {
+            resultElement.textContent = q.answered_by === currentLobbyUser?.id ? "정답!" : "다른 플레이어가 먼저 맞혔습니다.";
+            resultElement.style.color = q.answered_by === currentLobbyUser?.id ? "#72d49b" : "#f2c76e";
+        } else {
+            resultElement.textContent = `정답: ${currentUnit.name}`;
+            resultElement.style.color = "#f2c76e";
+        }
+        revealAllHintsForMultiplayer();
+    }
+}
+
+function startMultiplayerQuestion(unit, startedAt, alreadyRevealed = 0) {
+    stopTimers();
+    if (answerRevealTimer) clearTimeout(answerRevealTimer);
+    answerRevealTimer = null;
+    answerRevealAt = 0;
+    answered = false;
+    gameStarted = true;
+    questionNumberElement.textContent = questionNumber;
+    answerInput.value = "";
+    answerInput.disabled = false;
+    submitButton.disabled = false;
+    nextButton.style.display = "none";
+    resultElement.textContent = "";
+    scoreElement.textContent = score;
+
+    const allHints = buildHints(unit);
+    hintQueue = seededShuffle(allHints, multiplayerGameQuestionId || String(questionNumber));
+    revealedHints = [];
+    renderHints();
+
+    const startMs = Date.parse(startedAt || "");
+    const elapsed = Number.isFinite(startMs) ? Math.max(0, Date.now() - startMs) : 0;
+    const shouldReveal = Math.min(1 + Math.floor(elapsed / hintIntervalMs), allHints.length);
+    for (let i = 0; i < shouldReveal; i++) {
+        const next = getNextHint();
+        if (!next) break;
+        hintQueue.splice(hintQueue.indexOf(next), 1);
+        revealedHints.push(next);
+    }
+    renderHints();
+
+    if (hintQueue.length === 0) {
+        scheduleAnswerReveal(Math.max(0, 10000 - Math.max(0, elapsed - (allHints.length - 1) * hintIntervalMs)));
+        return;
+    }
+
+    const nextBoundary = (Math.floor(elapsed / hintIntervalMs) + 1) * hintIntervalMs;
+    startTimers(Math.max(0, nextBoundary - elapsed));
+}
+
+function revealAllHintsForMultiplayer() {
+    while (hintQueue.length > 0) {
+        const next = getNextHint();
+        if (!next) break;
+        const index = hintQueue.indexOf(next);
+        if (index >= 0) hintQueue.splice(index, 1);
+        revealedHints.push(next);
+    }
+    renderHints();
 }
 
 async function enterWaitingRoom() {
@@ -2286,6 +2470,15 @@ async function enterWaitingRoom() {
     syncWaitingHintInterval();
     await loadWaitingRoomState();
     await subscribeWaitingRoom();
+
+    const { data: existingGame } = await supabaseClient
+        .from("games")
+        .select("id, status, current_question, total_questions, hint_interval_ms, question_started_at")
+        .eq("room_id", currentRoomId)
+        .maybeSingle();
+    if (existingGame?.status === "playing") {
+        await beginMultiplayerGame(existingGame);
+    }
 }
 
 async function startMultiplayerGame() {
@@ -3212,7 +3405,39 @@ function startQuestion() {
    정답 확인
    ========================================================= */
 
-function checkAnswer() {
+async function checkAnswer() {
+
+    if (multiplayerMode && multiplayerGameQuestionId) {
+        if (answered) return;
+        const input = normalize(answerInput.value);
+        if (!input) return;
+        submitButton.disabled = true;
+        try {
+            const { data, error } = await supabaseClient.rpc("submit_answer", {
+                p_game_question_id: multiplayerGameQuestionId,
+                p_answer: input
+            });
+            if (error) throw error;
+            if (data?.correct) {
+                answered = true;
+                stopTimers();
+                answerInput.disabled = true;
+                resultElement.textContent = `정답! +${data.score_change}점`;
+                resultElement.style.color = "#72d49b";
+                revealAllHintsForMultiplayer();
+                nextButton.style.display = currentRoomIsHost ? "block" : "none";
+            } else {
+                resultElement.textContent = `오답입니다. ${data?.score_change ? `${data.score_change}점` : ""}`;
+                resultElement.style.color = "#df7777";
+                submitButton.disabled = false;
+            }
+        } catch (error) {
+            resultElement.textContent = error.message || "정답 제출에 실패했습니다.";
+            resultElement.style.color = "#df7777";
+            submitButton.disabled = false;
+        }
+        return;
+    }
 
     if (answered) {
         return;
@@ -3310,10 +3535,23 @@ function checkAnswer() {
    다음 문제
    ========================================================= */
 
-function nextQuestion() {
+async function nextQuestion() {
+    if (multiplayerMode && currentRoomId) {
+        if (!currentRoomIsHost) return;
+        nextButton.disabled = true;
+        try {
+            const { error } = await supabaseClient.rpc("next_question", { p_room_id: currentRoomId });
+            if (error) throw error;
+        } catch (error) {
+            resultElement.textContent = error.message || "다음 문제로 넘어가지 못했습니다.";
+            resultElement.style.color = "#df7777";
+        } finally {
+            nextButton.disabled = false;
+        }
+        return;
+    }
 
     questionNumber++;
-
     startQuestion();
 }
 
