@@ -957,7 +957,11 @@ button:disabled {
             <div class="admin-panel">
                 <h3>관리자</h3>
                 <button id="createRoomButton" type="button">방 만들기</button>
-                <div id="roomCodeDisplay" class="room-code-display" style="display:none;">생성된 방 코드<strong id="createdRoomCode"></strong></div>
+                <div id="roomCodeDisplay" class="room-code-display" style="display:none;">
+    생성된 방 코드
+    <strong id="createdRoomCode"></strong>
+    <button id="copyRoomCodeButton" type="button" style="margin-top:8px;">방 코드 복사</button>
+</div>
             </div>
         </div>
 
@@ -2009,6 +2013,7 @@ const adminArea = document.getElementById("adminArea");
 const createRoomButton = document.getElementById("createRoomButton");
 const createdRoomCode = document.getElementById("createdRoomCode");
 const roomCodeDisplay = document.getElementById("roomCodeDisplay");
+const copyRoomCodeButton = document.getElementById("copyRoomCodeButton");
 const lobbyStatus = document.getElementById("lobbyStatus");
 let currentLobbyUser = null;
 let currentRoomId = null;
@@ -2102,6 +2107,8 @@ async function createRoomFromLobby() {
     createRoomButton.disabled = true;
     setLobbyStatus("방을 만드는 중...");
     try {
+        // 관리자 로그인 세션이 실제로 존재하는지 확인한 뒤 방을 생성한다.
+        await ensureAnonymousSession();
         const { data, error } = await supabaseClient.rpc("create_room_with_nickname", { p_nickname: nickname });
         if (error) throw error;
         currentRoomId = data.room_id;
@@ -2109,6 +2116,7 @@ async function createRoomFromLobby() {
         lobbyRoomCode.value = data.room_code;
         createdRoomCode.textContent = data.room_code;
         roomCodeDisplay.style.display = "block";
+        setLobbyStatus(`방 생성 완료! 방 코드: ${data.room_code}`);
         await enterWaitingRoom();
     } catch (error) {
         setLobbyStatus(error.message || "방 생성에 실패했습니다.", true);
@@ -2282,6 +2290,17 @@ async function enterWaitingRoom() {
 
 async function startMultiplayerGame() {
     if (!currentRoomIsHost) return;
+
+    // 시작 직전에 최신 참가자 상태를 다시 읽는다.
+    // 방장이 혼자라면 비방장 READY 조건은 자동으로 충족된다.
+    await loadWaitingRoomState();
+    const nonHostPlayers = waitingRoomPlayers.filter(p => p.user_id !== roomHostIdForUi);
+    if (nonHostPlayers.length > 0 && !nonHostPlayers.every(p => p.is_ready)) {
+        setWaitingStatus("아직 READY하지 않은 참가자가 있습니다.", true);
+        applyWaitingRoleUI();
+        return;
+    }
+
     const selectedRaces = waitingRaceCheckboxes.filter(cb => cb.checked).map(cb => cb.value);
     const totalQuestions = Math.max(5, Math.min(50, Number(waitingQuestionCount.value) || 5));
     const hintIntervalMs = syncWaitingHintInterval();
@@ -2324,6 +2343,16 @@ showAdminLoginButton.addEventListener("click", () => {
 });
 adminLoginButton.addEventListener("click", loginAdmin);
 createRoomButton.addEventListener("click", createRoomFromLobby);
+copyRoomCodeButton.addEventListener("click", async () => {
+    const code = createdRoomCode.textContent.trim();
+    if (!code) return;
+    try {
+        await navigator.clipboard.writeText(code);
+        setLobbyStatus(`방 코드 ${code}가 복사되었습니다.`);
+    } catch (_) {
+        setLobbyStatus(`방 코드: ${code}`);
+    }
+});
 
 lobbyRoomCode.addEventListener("input", () => {
     lobbyRoomCode.value = lobbyRoomCode.value.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
