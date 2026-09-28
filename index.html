@@ -1,0 +1,2978 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StarCraft Unit Quiz</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    font-family: Arial, "Malgun Gothic", sans-serif;
+    background: #071018;
+    color: #e8f1f8;
+}
+
+body {
+    min-height: 100vh;
+}
+
+#app {
+    width: min(1200px, 96vw);
+    margin: 0 auto;
+    padding: 18px 0 20px;
+}
+
+/* 제목 */
+.title {
+    text-align: center;
+    margin-bottom: 14px;
+}
+
+.title h1 {
+    margin: 0;
+    font-size: 28px;
+    color: #dcecff;
+    letter-spacing: 1px;
+}
+
+.title p {
+    margin: 6px 0 0;
+    color: #7893a8;
+    font-size: 13px;
+}
+
+/* 상단 정보 / 설정 */
+.top-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.settings-button-wrap {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 250;
+}
+
+#settingsButton {
+    height: 42px;
+    min-width: 92px;
+    font-size: 14px;
+}
+
+/* 설정 모달 */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.68);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-backdrop.open { display: flex; }
+
+.settings-modal {
+    width: min(900px, 94vw);
+    max-height: 90vh;
+    overflow: auto;
+    background: #101b24;
+    border: 1px solid #355267;
+    border-radius: 14px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.5);
+    padding: 22px;
+}
+
+.settings-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.settings-modal-header h2 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.settings-section {
+    background: #0b151d;
+    border: 1px solid #263d4c;
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 14px;
+}
+
+.settings-section h3 {
+    margin: 0 0 14px;
+    font-size: 16px;
+}
+
+.hint-time-control-large {
+    display: grid;
+    grid-template-columns: 1fr 110px;
+    align-items: center;
+    gap: 16px;
+}
+
+#hintIntervalSlider {
+    width: 100%;
+    height: 34px;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    display: block;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+}
+
+#hintIntervalSlider::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(to right, #6f8fe8 0%, #6f8fe8 var(--hint-progress, 44.4444%), #e7e7e7 var(--hint-progress, 44.4444%), #e7e7e7 100%);
+}
+
+#hintIntervalSlider::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: #e7e7e7;
+}
+
+#hintIntervalSlider::-moz-range-progress {
+    height: 6px;
+    border-radius: 999px;
+    background: #6f8fe8;
+}
+
+#hintIntervalSlider::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -7px;
+    border: 0;
+    border-radius: 50%;
+    background: #5d7fd8;
+    cursor: pointer;
+}
+
+#hintIntervalSlider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 50%;
+    background: #5d7fd8;
+    cursor: pointer;
+}
+
+.hint-slider-wrap {
+    width: 100%;
+    padding: 0 10px;
+    box-sizing: border-box;
+}
+
+#hintIntervalInput {
+    width: 110px;
+    height: 42px;
+    padding: 0 10px;
+    background: #071018;
+    color: #e8f1f8;
+    border: 1px solid #355267;
+    border-radius: 7px;
+    font-size: 18px;
+    text-align: center;
+}
+
+.hint-time-scale-large {
+    position: relative;
+    width: 100%;
+    height: 20px;
+    margin: 4px 0 0;
+    color: #7893a8;
+    font-size: 10px;
+    text-align: center;
+}
+
+.hint-time-scale-large span {
+    position: absolute;
+    top: 0;
+    white-space: nowrap;
+    transform: translateX(-50%);
+}
+
+.hint-time-scale-large span:nth-child(1) { left: 0%; transform: none; }
+.hint-time-scale-large span:nth-child(2) { left: 5.0000%; }
+.hint-time-scale-large span:nth-child(3) { left: 10.0000%; }
+.hint-time-scale-large span:nth-child(4) { left: 15.0000%; }
+.hint-time-scale-large span:nth-child(5) { left: 20.0000%; }
+.hint-time-scale-large span:nth-child(6) { left: 25.0000%; }
+.hint-time-scale-large span:nth-child(7) { left: 30.0000%; }
+.hint-time-scale-large span:nth-child(8) { left: 35.0000%; }
+.hint-time-scale-large span:nth-child(9) { left: 40.0000%; }
+.hint-time-scale-large span:nth-child(10) { left: 45.0000%; }
+.hint-time-scale-large span:nth-child(11) { left: 50.0000%; }
+.hint-time-scale-large span:nth-child(12) { left: 55.0000%; }
+.hint-time-scale-large span:nth-child(13) { left: 60.0000%; }
+.hint-time-scale-large span:nth-child(14) { left: 65.0000%; }
+.hint-time-scale-large span:nth-child(15) { left: 70.0000%; }
+.hint-time-scale-large span:nth-child(16) { left: 75.0000%; }
+.hint-time-scale-large span:nth-child(17) { left: 80.0000%; }
+.hint-time-scale-large span:nth-child(18) { left: 85.0000%; }
+.hint-time-scale-large span:nth-child(19) { left: 90.0000%; }
+.hint-time-scale-large span:nth-child(20) { left: 95.0000%; }
+.hint-time-scale-large span:nth-child(21) { left: 100%; transform: translateX(-100%); }
+
+.hint-time-value {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: #bfe6ff;
+}
+
+.settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+/* 도감 */
+.codex-controls {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.codex-controls select {
+    height: 38px;
+    background: #071018;
+    color: #e8f1f8;
+    border: 1px solid #355267;
+    border-radius: 6px;
+    padding: 0 8px;
+}
+
+.codex-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.codex-unit-button {
+    height: auto;
+    min-height: 48px;
+    text-align: left;
+    padding: 8px 10px;
+    background: #162632;
+    border: 1px solid #294252;
+}
+
+.codex-unit-button small {
+    display: block;
+    margin-top: 3px;
+    color: #7893a8;
+    font-weight: normal;
+}
+
+.codex-detail {
+    margin-top: 12px;
+    padding: 14px;
+    background: #071018;
+    border: 1px solid #294252;
+    border-radius: 8px;
+    min-height: 100px;
+}
+
+.codex-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px 16px;
+}
+
+.codex-detail-item span:first-child {
+    color: #7893a8;
+    margin-right: 6px;
+}
+
+.codex-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 700;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0,0,0,.58);
+}
+
+.codex-overlay.open { display: flex; }
+
+.codex-modal {
+    width: min(900px, 94vw);
+    max-height: 86vh;
+    overflow: auto;
+    background: #101b24;
+    border: 1px solid #46647a;
+    border-radius: 14px;
+    box-shadow: 0 20px 70px rgba(0,0,0,.65);
+    padding: 20px;
+}
+
+.codex-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.codex-modal-header h2 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.codex-detail-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 800;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0,0,0,.58);
+}
+
+.codex-detail-overlay.open {
+    display: flex;
+}
+
+.codex-detail-modal {
+    width: min(760px, 92vw);
+    max-height: 86vh;
+    overflow: auto;
+    background: #101b24;
+    border: 1px solid #46647a;
+    border-radius: 14px;
+    box-shadow: 0 20px 70px rgba(0,0,0,.65);
+    padding: 20px;
+}
+
+.codex-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.codex-detail-header h3 {
+    margin: 0;
+    font-size: 21px;
+}
+
+.codex-detail-content {
+    padding: 16px;
+    background: #071018;
+    border: 1px solid #294252;
+    border-radius: 9px;
+}
+
+
+/* 멀티플레이 로비 */
+#lobbyOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #071018;
+    padding: 20px;
+}
+
+#lobbyOverlay.hidden { display: none; }
+
+.lobby-card {
+    width: min(460px, 92vw);
+    padding: 30px;
+    background: #101d27;
+    border: 1px solid #294252;
+    border-radius: 14px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.45);
+}
+
+.lobby-card h2 { margin: 0 0 8px; text-align: center; }
+.lobby-card p { margin: 0 0 20px; color: #7893a8; text-align: center; }
+.lobby-field { margin-bottom: 12px; }
+.lobby-field label { display: block; margin-bottom: 6px; font-size: 13px; color: #9bb2c3; }
+.lobby-field input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #355267; background: #071018; color: #e8f1f8; font-size: 15px; }
+.lobby-actions { display: grid; gap: 10px; margin-top: 16px; }
+.lobby-status { min-height: 22px; margin-top: 12px; text-align: center; color: #9bb2c3; font-size: 13px; }
+.admin-panel { margin-top: 18px; padding-top: 16px; border-top: 1px solid #263d4c; }
+.admin-panel h3 { margin: 0 0 10px; font-size: 14px; }
+#adminArea { display: none; }
+#adminArea.open { display: block; }
+#adminLoginArea { display: none; margin-top: 12px; }
+#adminLoginArea.open { display: block; }
+.room-code-display { margin-top: 10px; padding: 12px; text-align: center; border: 1px solid #355267; border-radius: 8px; background: #0b151d; }
+.room-code-display strong { display: block; margin-top: 4px; font-size: 25px; letter-spacing: 3px; color: #dcecff; }
+
+/* 시작 화면 / 3-2-1 */
+#startOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #071018;
+}
+
+#startOverlay.hidden { display: none; }
+
+.start-card {
+    text-align: center;
+    width: min(460px, 90vw);
+    padding: 38px 30px;
+    background: #101d27;
+    border: 1px solid #294252;
+    border-radius: 14px;
+}
+
+.start-card h2 { margin: 0 0 10px; font-size: 28px; }
+.start-card p { color: #7893a8; margin: 0 0 22px; }
+#startButton { min-width: 180px; font-size: 16px; }
+
+#countdownOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,.55);
+    pointer-events: none;
+}
+
+#countdownOverlay.active { display: flex; }
+
+#bigCountdown {
+    font-size: clamp(90px, 18vw, 190px);
+    font-weight: 900;
+    color: #e8f1f8;
+    text-shadow: 0 8px 35px rgba(0,0,0,.7);
+}
+
+.game-paused {
+    filter: saturate(.7);
+}
+
+.info-box {
+    background: #101d27;
+    border: 1px solid #294252;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+}
+
+.info-label {
+    color: #7691a4;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+.info-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+/* 문제 */
+.question-panel {
+    background: #0d1821;
+    border: 1px solid #294252;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+
+.question-number {
+    color: #6d91a8;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.question-text {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+/* 힌트 영역 */
+.hint-panel {
+    background: #0d1821;
+    border: 1px solid #294252;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.hint-title {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 9px;
+    color: #9fc5dd;
+}
+
+/* 핵심: 작은 카드 격자 */
+#hints {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.hint-card {
+    min-width: 0;
+    height: 66px;
+    border: 1px solid #263d4b;
+    border-radius: 6px;
+    background: #111f29;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 5px;
+    text-align: center;
+    overflow: hidden;
+}
+
+.hint-card.revealed {
+    background: #162a36;
+    border-color: #3b6379;
+    animation: appear 0.25s ease-out;
+}
+
+.hint-name {
+    font-size: 10px;
+    color: #718da0;
+    margin-bottom: 4px;
+    white-space: nowrap;
+}
+
+.hint-value {
+    font-size: 13px;
+    font-weight: bold;
+    color: #eaf7ff;
+    line-height: 1.15;
+    word-break: keep-all;
+}
+
+.hidden-card {
+    color: #334955;
+    font-size: 17px;
+}
+
+/* 입력 영역 */
+.answer-panel {
+    margin-top: 12px;
+    background: #0d1821;
+    border: 1px solid #294252;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.answer-row {
+    display: flex;
+    gap: 8px;
+}
+
+#answerInput {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    border: 1px solid #385364;
+    border-radius: 6px;
+    background: #081119;
+    color: white;
+    padding: 0 12px;
+    font-size: 14px;
+    outline: none;
+}
+
+#answerInput:focus {
+    border-color: #6fa5c4;
+}
+
+button {
+    height: 40px;
+    border: 0;
+    border-radius: 6px;
+    padding: 0 17px;
+    background: #315d75;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #407895;
+}
+
+button:disabled {
+    background: #273b47;
+    color: #72828b;
+    cursor: default;
+}
+
+.result {
+    min-height: 20px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: #a8c9dc;
+}
+
+.next-row {
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+#nextButton {
+    display: none;
+}
+
+/* 힌트 준비 */
+#loading {
+    text-align: center;
+    color: #668293;
+    padding: 20px;
+}
+
+/* 모바일 */
+@media (max-width: 850px) {
+    #hints {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .hint-card {
+        height: 62px;
+    }
+}
+
+@media (max-width: 600px) {
+    #app {
+        width: 94vw;
+        padding-top: 10px;
+    }
+
+    .title h1 {
+        font-size: 22px;
+    }
+
+    .settings-panel {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 280px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+    background: rgba(20,24,32,.92);
+    box-sizing: border-box;
+    z-index: 10;
+}
+
+.settings-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.hint-time-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#hintIntervalInput {
+    box-sizing: border-box;
+}
+
+.hint-time-unit {
+    font-size: 13px;
+    opacity: .8;
+}
+
+.hint-time-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    padding: 0 2px;
+    font-size: 10px;
+    opacity: .55;
+}
+
+@media (max-width: 700px) {
+    .settings-panel {
+        position: static;
+        width: 100%;
+        margin-bottom: 14px;
+    }
+}
+
+.top-panel {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+    }
+
+    .info-box {
+        padding: 7px 4px;
+    }
+
+    .info-value {
+        font-size: 17px;
+    }
+
+    #hints {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .hint-card {
+        height: 60px;
+    }
+
+    .hint-value {
+        font-size: 11px;
+    }
+
+    .answer-row {
+        flex-direction: column;
+    }
+
+    #answerInput,
+    button {
+        width: 100%;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="app">
+
+    <div class="title">
+        <h1>StarCraft Unit Quiz</h1>
+        <p>힌트를 보고 유닛을 맞혀라</p>
+    </div>
+
+    <div class="settings-button-wrap">
+        <button id="settingsButton">⚙ 설정</button>
+    </div>
+
+    <div class="top-panel">
+        <div class="info-box">
+            <div class="info-label">문제</div>
+            <div class="info-value" id="questionNumber">1</div>
+        </div>
+
+        <div class="info-box">
+            <div class="info-label" id="countdownLabel">다음 힌트</div>
+            <div class="info-value" id="countdown">5.0</div>
+        </div>
+
+        <div class="info-box">
+            <div class="info-label">점수</div>
+            <div class="info-value" id="score">0</div>
+        </div>
+    </div>
+
+    <div class="question-panel">
+        <div class="question-number">문제</div>
+        <div class="question-text">
+            공개되는 힌트를 보고 유닛을 맞혀라
+        </div>
+    </div>
+
+    <div class="hint-panel">
+        <div class="hint-title">공개된 힌트</div>
+        <div id="hints">
+            <div id="loading">힌트 준비 중...</div>
+        </div>
+    </div>
+
+    <div class="answer-panel">
+        <div class="answer-row">
+            <input
+                id="answerInput"
+                type="text"
+                placeholder="유닛 이름 입력"
+                autocomplete="off"
+            >
+            <button id="submitButton">정답</button>
+        </div>
+
+        <div class="result" id="result"></div>
+
+        <div class="next-row">
+            <button id="nextButton">다음 문제</button>
+        </div>
+    </div>
+
+</div>
+
+<div id="lobbyOverlay">
+    <div class="lobby-card">
+        <h2>온라인 방 참가</h2>
+        <p>닉네임과 방 코드를 입력하세요.</p>
+
+        <div class="lobby-field">
+            <label for="lobbyNickname">닉네임</label>
+            <input id="lobbyNickname" type="text" maxlength="20" placeholder="닉네임 입력" autocomplete="off">
+        </div>
+
+        <div class="lobby-field">
+            <label for="lobbyRoomCode">방 코드</label>
+            <input id="lobbyRoomCode" type="text" maxlength="6" placeholder="6자리 방 코드" autocomplete="off">
+        </div>
+
+        <div class="lobby-actions">
+            <button id="joinRoomButton">방 참가</button>
+            <button id="showAdminLoginButton" type="button">관리자 로그인</button>
+        </div>
+
+        <div id="adminLoginArea">
+            <div class="admin-panel">
+                <h3>관리자 로그인</h3>
+                <div class="lobby-field">
+                    <label for="adminEmail">이메일</label>
+                    <input id="adminEmail" type="email" placeholder="관리자 이메일" autocomplete="username">
+                </div>
+                <div class="lobby-field">
+                    <label for="adminPassword">비밀번호</label>
+                    <input id="adminPassword" type="password" placeholder="관리자 비밀번호" autocomplete="current-password">
+                </div>
+                <button id="adminLoginButton" type="button">관리자 로그인</button>
+            </div>
+        </div>
+
+        <div id="adminArea">
+            <div class="admin-panel">
+                <h3>관리자</h3>
+                <button id="createRoomButton" type="button">방 만들기</button>
+                <div id="roomCodeDisplay" class="room-code-display" style="display:none;">생성된 방 코드<strong id="createdRoomCode"></strong></div>
+            </div>
+        </div>
+
+        <div id="lobbyStatus" class="lobby-status"></div>
+    </div>
+</div>
+
+<div id="startOverlay">
+    <div class="start-card">
+        <h2>StarCraft Unit Quiz</h2>
+        <p>힌트를 보고 유닛을 맞혀라</p>
+        <button id="startButton">게임 시작</button>
+    </div>
+</div>
+
+<div id="countdownOverlay">
+    <div id="bigCountdown">3</div>
+</div>
+
+<div id="settingsModalBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="settings-modal-header">
+            <h2 id="settingsTitle">설정</h2>
+            <button id="closeSettingsButton">닫기</button>
+        </div>
+
+        <div class="settings-section">
+            <h3>힌트 공개 시간</h3>
+            <div class="hint-time-control-large">
+                <div class="hint-slider-wrap">
+                    <input id="hintIntervalSlider" type="range" min="0.5" max="10" step="0.5" value="5">
+                    <div class="hint-time-scale-large" aria-hidden="true">
+                        <span>0.5</span><span>1.0</span><span>1.5</span><span>2.0</span><span>2.5</span><span>3.0</span><span>3.5</span><span>4.0</span><span>4.5</span><span>5.0</span><span>5.5</span><span>6.0</span><span>6.5</span><span>7.0</span><span>7.5</span><span>8.0</span><span>8.5</span><span>9.0</span><span>9.5</span><span>10.0</span>
+                    </div>
+                </div>
+                <input id="hintIntervalInput" type="number" min="0.5" max="10" step="0.5" value="5" inputmode="decimal">
+            </div>
+            <div id="hintTimeValue" class="hint-time-value">5.0초</div>
+        </div>
+
+        <div class="settings-section">
+            <h3>도감</h3>
+            <button id="openCodexButton" type="button">도감 열기</button>
+        </div>
+
+    </div>
+</div>
+
+<div id="codexOverlay" class="codex-overlay" aria-hidden="true">
+    <div class="codex-modal" role="dialog" aria-modal="true" aria-labelledby="codexTitle">
+        <div class="codex-modal-header">
+            <h2 id="codexTitle">도감</h2>
+            <button id="closeCodexButton" type="button">닫기</button>
+        </div>
+        <div id="codexPanel" class="codex-panel">
+            <div class="codex-controls">
+                <select id="codexRaceFilter"><option value="all">종족: 전체</option><option value="테란">테란</option><option value="저그">저그</option><option value="프로토스">프로토스</option></select>
+                <select id="codexTierFilter"><option value="all">티어: 전체</option><option value="1">티어 1</option><option value="2">티어 2</option><option value="3">티어 3</option></select>
+                <select id="codexSort"><option value="tier">티어순</option><option value="speed">이동속도순</option><option value="mineral">미네랄순</option><option value="gas">가스순</option></select>
+                <select id="codexSortDirection"><option value="asc">오름차순</option><option value="desc">내림차순</option></select>
+            </div>
+            <div id="codexList" class="codex-list"></div>
+        </div>
+    </div>
+</div>
+
+<div id="codexDetailOverlay" class="codex-detail-overlay" aria-hidden="true">
+    <div class="codex-detail-modal" role="dialog" aria-modal="true" aria-labelledby="codexDetailTitle">
+        <div class="codex-detail-header">
+            <h3 id="codexDetailTitle">유닛 정보</h3>
+            <button id="closeCodexDetailButton" type="button">닫기</button>
+        </div>
+        <div id="codexDetailContent" class="codex-detail-content"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+
+/* =========================================================
+   유닛 데이터
+   ========================================================= */
+
+const units = [
+
+    /* ================= TERRAN ================= */
+
+    {
+        name: "SCV",
+        aliases: ["scv", "에스씨브이"],
+        race: "테란",
+        upgrades: 0,
+        type: "생체 + 기계",
+        supply: 1,
+        mineral: 50,
+        gas: 0,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 0.3,
+        production: "커맨드 센터",
+        tier: 1,
+        speed: 2.34
+    },
+
+    {
+        name: "마린",
+        aliases: ["marine"],
+        race: "테란",
+        upgrades: 2,
+        type: "생체",
+        supply: 1,
+        mineral: 50,
+        gas: 0,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: true,
+        range: 4,
+        production: "배럭",
+        tier: 1,
+        speed: 1.88
+    },
+
+    {
+        name: "파이어뱃",
+        aliases: ["firebat"],
+        race: "테란",
+        upgrades: 1,
+        type: "생체",
+        supply: 1,
+        mineral: 50,
+        gas: 25,
+        armor: 1,
+        size: "소형",
+        attack: "진동형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "배럭",
+        tier: 2,
+        speed: 1.88
+    },
+
+    {
+        name: "고스트",
+        aliases: ["ghost"],
+        race: "테란",
+        upgrades: 4,
+        type: "생체",
+        supply: 1,
+        mineral: 25,
+        gas: 75,
+        armor: 0,
+        size: "소형",
+        attack: "진동형",
+        ground: true,
+        air: true,
+        range: 7,
+        production: "배럭",
+        tier: 3,
+        speed: 1.88
+    },
+
+    {
+        name: "메딕",
+        aliases: ["medic"],
+        race: "테란",
+        upgrades: 3,
+        type: "생체",
+        supply: 1,
+        mineral: 50,
+        gas: 25,
+        armor: 1,
+        size: "소형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "배럭",
+        tier: 2,
+        speed: 1.88
+    },
+
+    {
+        name: "벌처",
+        aliases: ["vulture"],
+        race: "테란",
+        upgrades: 2,
+        type: "기계",
+        supply: 2,
+        mineral: 75,
+        gas: 0,
+        armor: 0,
+        size: "중형",
+        attack: "진동형",
+        ground: true,
+        air: false,
+        range: 5,
+        production: "팩토리",
+        tier: 2,
+        speed: 3.13
+    },
+
+    {
+        name: "스파이더 마인",
+        aliases: ["spider mine", "spidermine", "마인"],
+        race: "테란",
+        upgrades: 0,
+        type: "기계",
+        supply: 0,
+        mineral: 0,
+        gas: 0,
+        armor: 0,
+        size: "소형",
+        attack: "폭발형",
+        ground: true,
+        air: false,
+        range: 3,
+        production: "없음",
+        tier: 2,
+        speed: null
+    },
+
+    {
+        name: "시즈 탱크",
+        aliases: ["siege tank", "tank"],
+        race: "테란",
+        upgrades: 1,
+        type: "기계",
+        supply: 2,
+        mineral: 150,
+        gas: 100,
+        armor: 1,
+        size: "대형",
+        attack: "폭발형",
+        ground: true,
+        air: false,
+        range: 7,
+        production: "팩토리",
+        tier: 2,
+        speed: 1.91
+    },
+
+    {
+        name: "골리앗",
+        aliases: ["goliath"],
+        race: "테란",
+        upgrades: 1,
+        type: "기계",
+        supply: 2,
+        mineral: 100,
+        gas: 50,
+        armor: 1,
+        size: "대형",
+        attack: "일반형 / 폭발형",
+        ground: true,
+        air: true,
+        range: 5,
+        production: "팩토리",
+        tier: 2,
+        speed: 2.20
+    },
+
+    {
+        name: "레이스",
+        aliases: ["wraith"],
+        race: "테란",
+        upgrades: 2,
+        type: "기계",
+        supply: 2,
+        mineral: 150,
+        gas: 100,
+        armor: 0,
+        size: "대형",
+        attack: "일반형 / 폭발형",
+        ground: true,
+        air: true,
+        range: 5,
+        production: "스타포트",
+        tier: 2,
+        speed: 3.13
+    },
+
+    {
+        name: "드랍십",
+        aliases: ["dropship"],
+        race: "테란",
+        upgrades: 0,
+        type: "기계",
+        supply: 2,
+        mineral: 100,
+        gas: 100,
+        armor: 1,
+        size: "대형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "스타포트",
+        tier: 2,
+        speed: 2.56
+    },
+
+    {
+        name: "사이언스 베슬",
+        aliases: ["science vessel", "vessel"],
+        race: "테란",
+        upgrades: 3,
+        type: "기계",
+        supply: 2,
+        mineral: 100,
+        gas: 225,
+        armor: 1,
+        size: "대형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "스타포트",
+        tier: 3,
+        speed: 2.34
+    },
+
+    {
+        name: "배틀크루저",
+        aliases: ["battlecruiser", "배틀"],
+        race: "테란",
+        upgrades: 2,
+        type: "기계",
+        supply: 6,
+        mineral: 400,
+        gas: 300,
+        armor: 3,
+        size: "대형",
+        attack: "일반형",
+        ground: true,
+        air: true,
+        range: 6,
+        production: "스타포트",
+        tier: 3,
+        speed: 1.17
+    },
+
+    {
+        name: "발키리",
+        aliases: ["valkyrie"],
+        race: "테란",
+        upgrades: 0,
+        type: "기계",
+        supply: 3,
+        mineral: 250,
+        gas: 125,
+        armor: 2,
+        size: "대형",
+        attack: "폭발형",
+        ground: false,
+        air: true,
+        range: 6,
+        production: "스타포트",
+        tier: 3,
+        speed: 3.10
+    },
+
+
+    /* ================= ZERG ================= */
+
+    {
+        name: "라바",
+        aliases: ["larva"],
+        race: "저그",
+        upgrades: 0,
+        type: "생체",
+        supply: 0,
+        mineral: 0,
+        gas: 0,
+        armor: 10,
+        size: "소형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "해처리 / 레어 / 하이브",
+        tier: 1,
+        speed: 0.94
+    },
+
+    {
+        name: "드론",
+        aliases: ["drone"],
+        race: "저그",
+        upgrades: 0,
+        type: "생체",
+        supply: 1,
+        mineral: 50,
+        gas: 0,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "해처리 / 레어 / 하이브",
+        tier: 1,
+        speed: 2.34
+    },
+
+    {
+        name: "오버로드",
+        aliases: ["overlord"],
+        race: "저그",
+        upgrades: 3,
+        type: "생체",
+        supply: 0,
+        mineral: 100,
+        gas: 0,
+        armor: 0,
+        size: "대형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "해처리 / 레어 / 하이브",
+        tier: 1,
+        speed: 1.56
+    },
+
+    {
+        name: "저글링",
+        aliases: ["zergling"],
+        race: "저그",
+        upgrades: 2,
+        type: "생체",
+        supply: 0.5,
+        mineral: 25,
+        gas: 0,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "해처리 / 레어 / 하이브",
+        tier: 1,
+        speed: 2.61
+    },
+
+    {
+        name: "히드라리스크",
+        aliases: ["hydralisk", "히드라"],
+        race: "저그",
+        upgrades: 2,
+        type: "생체",
+        supply: 1,
+        mineral: 75,
+        gas: 25,
+        armor: 0,
+        size: "중형",
+        attack: "폭발형",
+        ground: true,
+        air: true,
+        range: 4,
+        production: "해처리 / 레어 / 하이브",
+        tier: 2,
+        speed: 2.61
+    },
+
+    {
+        name: "러커",
+        aliases: ["lurker"],
+        race: "저그",
+        upgrades: 1,
+        type: "생체",
+        supply: 2,
+        mineral: 50,
+        gas: 100,
+        armor: 1,
+        size: "중형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 6,
+        production: "변태",
+        tier: 2,
+        speed: 2.81
+    },
+
+    {
+        name: "뮤탈리스크",
+        aliases: ["mutalisk", "뮤탈"],
+        race: "저그",
+        upgrades: 0,
+        type: "생체",
+        supply: 2,
+        mineral: 100,
+        gas: 100,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: true,
+        range: 3,
+        production: "해처리 / 레어 / 하이브",
+        tier: 2,
+        speed: 3.13
+    },
+
+    {
+        name: "스커지",
+        aliases: ["scourge"],
+        race: "저그",
+        upgrades: 0,
+        type: "생체",
+        supply: 0.5,
+        mineral: 12,
+        gas: 38,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: false,
+        air: true,
+        range: 1,
+        production: "해처리 / 레어 / 하이브",
+        tier: 2,
+        speed: 3.13
+    },
+
+    {
+        name: "퀸",
+        aliases: ["queen"],
+        race: "저그",
+        upgrades: 3,
+        type: "생체",
+        supply: 2,
+        mineral: 100,
+        gas: 100,
+        armor: 0,
+        size: "중형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "해처리 / 레어 / 하이브",
+        tier: 2,
+        speed: 3.13
+    },
+
+    {
+        name: "감염된 테란",
+        aliases: ["infested terran", "infested"],
+        race: "저그",
+        upgrades: 0,
+        type: "생체",
+        supply: 1,
+        mineral: 100,
+        gas: 50,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "커맨드 센터",
+        tier: 2,
+        speed: 2.81
+    },
+
+    {
+        name: "브루들링",
+        aliases: ["broodling"],
+        race: "저그",
+        upgrades: 0,
+        type: "생체",
+        supply: 0,
+        mineral: 0,
+        gas: 0,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "없음",
+        tier: 2,
+        speed: 2.74
+    },
+
+    {
+        name: "울트라리스크",
+        aliases: ["ultralisk", "울트라"],
+        race: "저그",
+        upgrades: 2,
+        type: "생체",
+        supply: 4,
+        mineral: 200,
+        gas: 200,
+        armor: 1,
+        size: "대형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "해처리 / 레어 / 하이브",
+        tier: 3,
+        speed: 3.80
+    },
+
+    {
+        name: "가디언",
+        aliases: ["guardian"],
+        race: "저그",
+        upgrades: 0,
+        type: "생체",
+        supply: 2,
+        mineral: 50,
+        gas: 100,
+        armor: 2,
+        size: "대형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 8,
+        production: "변태",
+        tier: 3,
+        speed: 1.17
+    },
+
+    {
+        name: "디바우러",
+        aliases: ["devourer"],
+        race: "저그",
+        upgrades: 0,
+        type: "생체",
+        supply: 2,
+        mineral: 150,
+        gas: 50,
+        armor: 2,
+        size: "대형",
+        attack: "폭발형",
+        ground: false,
+        air: true,
+        range: 6,
+        production: "변태",
+        tier: 3,
+        speed: 2.34
+    },
+
+    {
+        name: "디파일러",
+        aliases: ["defiler"],
+        race: "저그",
+        upgrades: 3,
+        type: "생체",
+        supply: 2,
+        mineral: 50,
+        gas: 150,
+        armor: 1,
+        size: "중형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "해처리 / 레어 / 하이브",
+        tier: 3,
+        speed: 1.88
+    },
+
+
+    /* ================= PROTOSS ================= */
+
+    {
+        name: "프로브",
+        aliases: ["probe"],
+        race: "프로토스",
+        upgrades: 0,
+        type: "기계",
+        supply: 1,
+        mineral: 50,
+        gas: 0,
+        armor: 0,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "넥서스",
+        tier: 1,
+        speed: 2.34
+    },
+
+    {
+        name: "질럿",
+        aliases: ["zealot"],
+        race: "프로토스",
+        upgrades: 1,
+        type: "생체",
+        supply: 2,
+        mineral: 100,
+        gas: 0,
+        armor: 1,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "게이트웨이",
+        tier: 1,
+        speed: 1.88
+    },
+
+    {
+        name: "드라군",
+        aliases: ["dragoon"],
+        race: "프로토스",
+        upgrades: 1,
+        type: "기계",
+        supply: 2,
+        mineral: 125,
+        gas: 50,
+        armor: 1,
+        size: "대형",
+        attack: "폭발형",
+        ground: true,
+        air: true,
+        range: 4,
+        production: "게이트웨이",
+        tier: 1,
+        speed: 2.47
+    },
+
+    {
+        name: "하이 템플러",
+        aliases: ["high templar", "templar"],
+        race: "프로토스",
+        upgrades: 3,
+        type: "생체",
+        supply: 2,
+        mineral: 50,
+        gas: 150,
+        armor: 0,
+        size: "소형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "게이트웨이",
+        tier: 2,
+        speed: 1.56
+    },
+
+    {
+        name: "다크 템플러",
+        aliases: ["dark templar", "dark"],
+        race: "프로토스",
+        upgrades: 0,
+        type: "생체",
+        supply: 2,
+        mineral: 125,
+        gas: 100,
+        armor: 1,
+        size: "소형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 1,
+        production: "게이트웨이",
+        tier: 2,
+        speed: 2.34
+    },
+
+    {
+        name: "셔틀",
+        aliases: ["shuttle"],
+        race: "프로토스",
+        upgrades: 1,
+        type: "기계",
+        supply: 2,
+        mineral: 200,
+        gas: 0,
+        armor: 1,
+        size: "대형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "로보틱스 퍼실리티",
+        tier: 2,
+        speed: 2.08
+    },
+
+    {
+        name: "리버",
+        aliases: ["reaver"],
+        race: "프로토스",
+        upgrades: 2,
+        type: "기계",
+        supply: 4,
+        mineral: 200,
+        gas: 100,
+        armor: 0,
+        size: "대형",
+        attack: "일반형",
+        ground: true,
+        air: false,
+        range: 8,
+        production: "로보틱스 퍼실리티",
+        tier: 3,
+        speed: 0.83
+    },
+
+    {
+        name: "옵저버",
+        aliases: ["observer"],
+        race: "프로토스",
+        upgrades: 2,
+        type: "기계",
+        supply: 1,
+        mineral: 25,
+        gas: 75,
+        armor: 0,
+        size: "소형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "로보틱스 퍼실리티",
+        tier: 3,
+        speed: 1.56
+    },
+
+    {
+        name: "스카웃",
+        aliases: ["scout"],
+        race: "프로토스",
+        upgrades: 2,
+        type: "기계",
+        supply: 3,
+        mineral: 275,
+        gas: 125,
+        armor: 0,
+        size: "대형",
+        attack: "일반형 / 폭발형",
+        ground: true,
+        air: true,
+        range: 4,
+        production: "스타게이트",
+        tier: 2,
+        speed: 3.13
+    },
+
+    {
+        name: "커세어",
+        aliases: ["corsair"],
+        race: "프로토스",
+        upgrades: 2,
+        type: "기계",
+        supply: 2,
+        mineral: 150,
+        gas: 100,
+        armor: 1,
+        size: "중형",
+        attack: "폭발형",
+        ground: false,
+        air: true,
+        range: 5,
+        production: "스타게이트",
+        tier: 2,
+        speed: 3.15
+    },
+
+    {
+        name: "캐리어",
+        aliases: ["carrier"],
+        race: "프로토스",
+        upgrades: 1,
+        type: "기계",
+        supply: 6,
+        mineral: 350,
+        gas: 250,
+        armor: 4,
+        size: "대형",
+        attack: "일반형",
+        ground: true,
+        air: true,
+        range: 8,
+        production: "스타게이트",
+        tier: 3,
+        speed: 1.56
+    },
+
+    {
+        name: "아비터",
+        aliases: ["arbiter"],
+        race: "프로토스",
+        upgrades: 3,
+        type: "기계",
+        supply: 4,
+        mineral: 100,
+        gas: 350,
+        armor: 1,
+        size: "대형",
+        attack: "폭발형",
+        ground: true,
+        air: true,
+        range: 5,
+        production: "스타게이트",
+        tier: 3,
+        speed: 2.75
+    },
+
+    {
+        name: "아콘",
+        aliases: ["archon", "아콘", "아칸"],
+        race: "프로토스",
+        upgrades: 0,
+        type: "없음",
+        supply: 4,
+        mineral: 0,
+        gas: 0,
+        armor: 0,
+        size: "대형",
+        attack: "일반형",
+        ground: true,
+        air: true,
+        range: 2,
+        production: "합체",
+        tier: 3,
+        speed: 2.34
+    },
+
+    {
+        name: "다크 아콘",
+        aliases: ["dark archon", "darkarchon", "다크 아콘", "다크 아칸"],
+        race: "프로토스",
+        upgrades: 3,
+        type: "없음",
+        supply: 4,
+        mineral: 0,
+        gas: 0,
+        armor: 1,
+        size: "대형",
+        attack: "없음",
+        ground: false,
+        air: false,
+        range: 0,
+        production: "합체",
+        tier: 3,
+        speed: 2.34
+    }
+];
+
+
+/* =========================================================
+   게임 설정
+   ========================================================= */
+
+let hintIntervalMs = 5000;
+
+let currentUnit = null;
+let questionNumber = 1;
+let score = 0;
+
+let hintQueue = [];
+let revealedHints = [];
+
+let timer = null;
+let countdownTimer = null;
+let answerRevealTimer = null;
+let answerRevealAt = 0;
+let pausedAnswerRevealRemainingMs = null;
+let nextHintAt = 0;
+
+let answered = false;
+let gameStarted = false;
+let settingsOpen = false;
+let pausedRemainingMs = null;
+
+
+/* =========================================================
+   DOM
+   ========================================================= */
+
+// Supabase 멀티플레이 연결
+const SUPABASE_URL = "https://cinyhkisgsqzwcmwjtks.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_5Mnp9pckLocgVWCWOtdsrA_vBGENr03";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+const lobbyOverlay = document.getElementById("lobbyOverlay");
+const lobbyNickname = document.getElementById("lobbyNickname");
+const lobbyRoomCode = document.getElementById("lobbyRoomCode");
+const joinRoomButton = document.getElementById("joinRoomButton");
+const showAdminLoginButton = document.getElementById("showAdminLoginButton");
+const adminLoginArea = document.getElementById("adminLoginArea");
+const adminEmail = document.getElementById("adminEmail");
+const adminPassword = document.getElementById("adminPassword");
+const adminLoginButton = document.getElementById("adminLoginButton");
+const adminArea = document.getElementById("adminArea");
+const createRoomButton = document.getElementById("createRoomButton");
+const createdRoomCode = document.getElementById("createdRoomCode");
+const roomCodeDisplay = document.getElementById("roomCodeDisplay");
+const lobbyStatus = document.getElementById("lobbyStatus");
+let currentLobbyUser = null;
+let currentRoomId = null;
+let currentRoomCode = null;
+
+function setLobbyStatus(message, isError = false) {
+    lobbyStatus.textContent = message;
+    lobbyStatus.style.color = isError ? "#df7777" : "#9bb2c3";
+}
+
+async function ensureAnonymousSession() {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    if (sessionData?.session?.user) {
+        currentLobbyUser = sessionData.session.user;
+        return currentLobbyUser;
+    }
+    const { data, error } = await supabaseClient.auth.signInAnonymously();
+    if (error) throw error;
+    currentLobbyUser = data.user;
+    return currentLobbyUser;
+}
+
+async function joinRoomFromLobby() {
+    const nickname = lobbyNickname.value.trim();
+    const roomCode = lobbyRoomCode.value.trim().toLowerCase();
+    if (!nickname) { setLobbyStatus("닉네임을 입력해주세요.", true); return; }
+    if (!/^[a-z0-9]{6}$/.test(roomCode)) { setLobbyStatus("방 코드는 영문 소문자+숫자 6자리입니다.", true); return; }
+
+    joinRoomButton.disabled = true;
+    setLobbyStatus("방에 참가하는 중...");
+    try {
+        await ensureAnonymousSession();
+        const { data, error } = await supabaseClient.rpc("join_room", { p_room_code: roomCode, p_nickname: nickname });
+        if (error) throw error;
+        currentRoomId = data.room_id;
+        currentRoomCode = roomCode;
+        setLobbyStatus("방 참가 완료. 게임을 시작합니다.");
+        setTimeout(() => {
+            lobbyOverlay.classList.add("hidden");
+            startOverlay.classList.remove("hidden");
+        }, 250);
+    } catch (error) {
+        setLobbyStatus(error.message || "방 참가에 실패했습니다.", true);
+    } finally {
+        joinRoomButton.disabled = false;
+    }
+}
+
+async function loginAdmin() {
+    const email = adminEmail.value.trim();
+    const password = adminPassword.value;
+    if (!email || !password) { setLobbyStatus("관리자 이메일과 비밀번호를 입력해주세요.", true); return; }
+    adminLoginButton.disabled = true;
+    setLobbyStatus("관리자 로그인 중...");
+    try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        currentLobbyUser = data.user;
+        adminArea.classList.add("open");
+        adminLoginArea.classList.remove("open");
+        setLobbyStatus("관리자 로그인 완료. 방을 만들 수 있습니다.");
+    } catch (error) {
+        setLobbyStatus(error.message || "관리자 로그인에 실패했습니다.", true);
+    } finally {
+        adminLoginButton.disabled = false;
+    }
+}
+
+async function createRoomFromLobby() {
+    createRoomButton.disabled = true;
+    setLobbyStatus("방을 만드는 중...");
+    try {
+        const { data, error } = await supabaseClient.rpc("create_room");
+        if (error) throw error;
+        currentRoomId = data.room_id;
+        currentRoomCode = data.room_code;
+        lobbyRoomCode.value = data.room_code;
+        createdRoomCode.textContent = data.room_code;
+        roomCodeDisplay.style.display = "block";
+        setLobbyStatus("방 생성 완료. 이 코드를 친구들에게 알려주세요.");
+    } catch (error) {
+        setLobbyStatus(error.message || "방 생성에 실패했습니다.", true);
+    } finally {
+        createRoomButton.disabled = false;
+    }
+}
+
+joinRoomButton.addEventListener("click", joinRoomFromLobby);
+showAdminLoginButton.addEventListener("click", () => {
+    adminLoginArea.classList.toggle("open");
+});
+adminLoginButton.addEventListener("click", loginAdmin);
+createRoomButton.addEventListener("click", createRoomFromLobby);
+
+lobbyRoomCode.addEventListener("input", () => {
+    lobbyRoomCode.value = lobbyRoomCode.value.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
+});
+
+const hintsElement = document.getElementById("hints");
+const countdownElement = document.getElementById("countdown");
+const countdownLabelElement = document.getElementById("countdownLabel");
+const scoreElement = document.getElementById("score");
+const questionNumberElement = document.getElementById("questionNumber");
+
+const answerInput = document.getElementById("answerInput");
+const submitButton = document.getElementById("submitButton");
+const nextButton = document.getElementById("nextButton");
+const resultElement = document.getElementById("result");
+const settingsButton = document.getElementById("settingsButton");
+const settingsModalBackdrop = document.getElementById("settingsModalBackdrop");
+const closeSettingsButton = document.getElementById("closeSettingsButton");
+const startOverlay = document.getElementById("startOverlay");
+const startButton = document.getElementById("startButton");
+const countdownOverlay = document.getElementById("countdownOverlay");
+const bigCountdown = document.getElementById("bigCountdown");
+const hintTimeValue = document.getElementById("hintTimeValue");
+const codexRaceFilter = document.getElementById("codexRaceFilter");
+const codexTierFilter = document.getElementById("codexTierFilter");
+const codexSort = document.getElementById("codexSort");
+const codexSortDirection = document.getElementById("codexSortDirection");
+const codexList = document.getElementById("codexList");
+const codexDetailOverlay = document.getElementById("codexDetailOverlay");
+const codexDetailContent = document.getElementById("codexDetailContent");
+const closeCodexDetailButton = document.getElementById("closeCodexDetailButton");
+const openCodexButton = document.getElementById("openCodexButton");
+const codexPanel = document.getElementById("codexPanel");
+const codexOverlay = document.getElementById("codexOverlay");
+const closeCodexButton = document.getElementById("closeCodexButton");
+
+const hintIntervalSlider = document.getElementById("hintIntervalSlider");
+const hintIntervalInput = document.getElementById("hintIntervalInput");
+
+
+/* =========================================================
+   힌트 공개 시간 설정
+   - 0.5~10초 범위
+   - 0.1초 단위 선택 가능
+   - 정수 초 지점에서 스냅하되, 반대 방향으로 계속 드래그할 수 있다.
+   ========================================================= */
+
+function clampHintInterval(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return 5;
+    }
+
+    // 설정 범위는 0.5초~10초로 고정한다.
+    return Math.min(10, Math.max(0.5, number));
+}
+
+function normalizeHintInterval(value) {
+    const clamped = clampHintInterval(value);
+    // 0.5초 단위로만 선택 가능
+    return Math.round(clamped * 2) / 2;
+}
+
+function setHintInterval(value, resetCurrentCountdown = true) {
+    const nextValue = normalizeHintInterval(value);
+
+    hintIntervalMs = nextValue * 1000;
+    hintIntervalSlider.value = nextValue.toFixed(1);
+    hintIntervalInput.value = nextValue.toFixed(1);
+    hintTimeValue.textContent = `${nextValue.toFixed(1)}초`;
+    const progress = ((nextValue - 0.5) / 9.5) * 100;
+    hintIntervalSlider.style.setProperty("--hint-progress", `${progress}%`);
+
+    if (resetCurrentCountdown && timer && !answered) {
+        nextHintAt = Date.now() + hintIntervalMs;
+    }
+}
+
+hintIntervalSlider.addEventListener("input", () => {
+    setHintInterval(hintIntervalSlider.value, true);
+});
+
+hintIntervalSlider.addEventListener("change", () => {
+    setHintInterval(hintIntervalSlider.value, true);
+});
+
+hintIntervalInput.addEventListener("input", () => {
+    const raw = hintIntervalInput.value;
+    if (raw === "") return;
+    setHintInterval(raw, true);
+});
+
+hintIntervalInput.addEventListener("blur", () => {
+    setHintInterval(hintIntervalInput.value || 5, true);
+});
+
+/* =========================================================
+   설정 / 일시정지
+   ========================================================= */
+
+function openSettings() {
+    if (settingsOpen) return;
+
+    settingsOpen = true;
+    pausedRemainingMs = (gameStarted && !answered && hintQueue.length > 0)
+        ? Math.max(0, nextHintAt - Date.now())
+        : null;
+    pausedAnswerRevealRemainingMs = (gameStarted && !answered && hintQueue.length === 0 && answerRevealAt > 0)
+        ? Math.max(0, answerRevealAt - Date.now())
+        : null;
+    stopTimers();
+    document.body.classList.add("game-paused");
+    settingsModalBackdrop.classList.add("open");
+    settingsModalBackdrop.setAttribute("aria-hidden", "false");
+    closeCodexOverlay();
+}
+
+function closeSettings() {
+    if (!settingsOpen) return;
+
+    closeCodexDetail();
+    closeCodexOverlay();
+    settingsOpen = false;
+    settingsModalBackdrop.classList.remove("open");
+    settingsModalBackdrop.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("game-paused");
+
+    if (!answered && gameStarted) {
+        if (hintQueue.length > 0) {
+            const remaining = pausedRemainingMs === null ? hintIntervalMs : pausedRemainingMs;
+            startTimers(remaining);
+        } else if (pausedAnswerRevealRemainingMs !== null) {
+            scheduleAnswerReveal(pausedAnswerRevealRemainingMs);
+        }
+    }
+    pausedRemainingMs = null;
+    pausedAnswerRevealRemainingMs = null;
+}
+
+function startTimers(remainingMs = hintIntervalMs) {
+    stopTimers();
+    nextHintAt = Date.now() + Math.max(0, remainingMs);
+
+    timer = setInterval(() => {
+        if (answered || settingsOpen) return;
+        if (Date.now() >= nextHintAt) {
+            revealNextHint();
+            if (hintQueue.length > 0) {
+                nextHintAt = Date.now() + hintIntervalMs;
+            }
+        }
+    }, 50);
+
+    countdownTimer = setInterval(() => {
+        if (answered || settingsOpen) return;
+        const remaining = Math.max(0, nextHintAt - Date.now());
+        countdownElement.textContent = (remaining / 1000).toFixed(1);
+    }, 50);
+}
+
+function runInitialCountdown() {
+    if (gameStarted) return;
+    startButton.disabled = true;
+    countdownOverlay.classList.add("active");
+    const values = ["3", "2", "1"];
+    let index = 0;
+    bigCountdown.textContent = values[index];
+    const interval = setInterval(() => {
+        index++;
+        if (index >= values.length) {
+            clearInterval(interval);
+            countdownOverlay.classList.remove("active");
+            startOverlay.classList.add("hidden");
+            gameStarted = true;
+            startQuestion();
+            return;
+        }
+        bigCountdown.textContent = values[index];
+    }, 1000);
+}
+
+settingsButton.addEventListener("click", openSettings);
+openCodexButton.addEventListener("click", openCodexOverlay);
+closeSettingsButton.addEventListener("click", closeSettings);
+settingsModalBackdrop.addEventListener("click", event => {
+    if (event.target === settingsModalBackdrop) closeSettings();
+});
+startButton.addEventListener("click", runInitialCountdown);
+
+/* =========================================================
+   도감
+   ========================================================= */
+
+function getCodexMetric(unit, sort) {
+    if (sort === "speed") {
+        return { label: "이동속도", value: unit.speed == null ? "없음" : Number(unit.speed).toFixed(2) };
+    }
+    if (sort === "mineral") {
+        return { label: "미네랄", value: unit.mineral };
+    }
+    if (sort === "gas") {
+        return { label: "가스", value: unit.gas };
+    }
+    return { label: "티어", value: unit.tier };
+}
+
+function openCodexOverlay() {
+    renderCodex();
+    codexOverlay.classList.add("open");
+    codexOverlay.setAttribute("aria-hidden", "false");
+}
+
+function closeCodexOverlay() {
+    codexOverlay.classList.remove("open");
+    codexOverlay.setAttribute("aria-hidden", "true");
+}
+
+function renderCodex() {
+    const race = codexRaceFilter.value;
+    const tier = codexTierFilter.value;
+    const sort = codexSort.value || "tier";
+    const direction = codexSortDirection.value || "asc";
+    const directionMultiplier = direction === "desc" ? -1 : 1;
+
+    let list = units.filter(unit => {
+        return (race === "all" || unit.race === race) &&
+               (tier === "all" || String(unit.tier) === tier);
+    });
+
+    list.sort((a, b) => {
+        let result = 0;
+        if (sort === "tier") {
+            result = a.tier - b.tier;
+        } else if (sort === "speed") {
+            const aValue = a.speed == null ? -1 : Number(a.speed);
+            const bValue = b.speed == null ? -1 : Number(b.speed);
+            result = aValue - bValue;
+        } else if (sort === "mineral") {
+            result = a.mineral - b.mineral;
+        } else if (sort === "gas") {
+            result = a.gas - b.gas;
+        }
+        return (result * directionMultiplier) || a.name.localeCompare(b.name, "ko");
+    });
+
+    codexList.innerHTML = "";
+    list.forEach(unit => {
+        const button = document.createElement("button");
+        button.className = "codex-unit-button";
+        const metric = getCodexMetric(unit, sort);
+        button.innerHTML = `${unit.name}<small>${unit.race} · ${metric.label}: ${metric.value}</small>`;
+        button.addEventListener("click", () => showCodexDetail(unit));
+        codexList.appendChild(button);
+    });
+}
+
+function showCodexDetail(unit) {
+    const speed = unit.speed === null || unit.speed === undefined ? "없음" : Number(unit.speed).toFixed(2);
+    const range = unit.range > 0 ? unit.range : "사거리 없음";
+    codexDetailContent.innerHTML = `
+        <h4 id="codexDetailUnitName" style="margin:0 0 12px; font-size:20px">${unit.name}</h4>
+        <div class="codex-detail-grid">
+            <div class="codex-detail-item"><span>종족</span>${unit.race}</div>
+            <div class="codex-detail-item"><span>티어</span>${unit.tier}</div>
+            <div class="codex-detail-item"><span>유형</span>${unit.type}</div>
+            <div class="codex-detail-item"><span>인구수</span>${unit.supply}</div>
+            <div class="codex-detail-item"><span>미네랄</span>${unit.mineral}</div>
+            <div class="codex-detail-item"><span>가스</span>${unit.gas}</div>
+            <div class="codex-detail-item"><span>방어력</span>${unit.armor}</div>
+            <div class="codex-detail-item"><span>크기</span>${unit.size}</div>
+            <div class="codex-detail-item"><span>공격형</span>${unit.attack}</div>
+            <div class="codex-detail-item"><span>지상 공격</span>${unit.ground ? "가능" : "불가"}</div>
+            <div class="codex-detail-item"><span>공중 공격</span>${unit.air ? "가능" : "불가"}</div>
+            <div class="codex-detail-item"><span>사거리</span>${range}</div>
+            <div class="codex-detail-item"><span>이동속도</span>${speed}</div>
+            <div class="codex-detail-item"><span>생산/획득</span>${unit.production}</div>
+            <div class="codex-detail-item"><span>전용 업그레이드</span>${unit.upgrades}개</div>
+        </div>`;
+    codexDetailOverlay.classList.add("open");
+    codexDetailOverlay.setAttribute("aria-hidden", "false");
+}
+
+function closeCodexDetail() {
+    codexDetailOverlay.classList.remove("open");
+    codexDetailOverlay.setAttribute("aria-hidden", "true");
+}
+
+codexRaceFilter.addEventListener("change", renderCodex);
+codexTierFilter.addEventListener("change", renderCodex);
+codexSort.addEventListener("change", renderCodex);
+codexSortDirection.addEventListener("change", renderCodex);
+closeCodexDetailButton.addEventListener("click", closeCodexDetail);
+closeCodexButton.addEventListener("click", closeCodexOverlay);
+codexOverlay.addEventListener("click", event => {
+    if (event.target === codexOverlay) closeCodexOverlay();
+});
+codexDetailOverlay.addEventListener("click", event => {
+    if (event.target === codexDetailOverlay) closeCodexDetail();
+});
+
+/* =========================================================
+   공통 함수
+   ========================================================= */
+
+function shuffle(array) {
+    const copy = [...array];
+
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+
+    return copy;
+}
+
+function normalize(text) {
+    return text
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "");
+}
+
+
+/* =========================================================
+   새 숫자 힌트
+   - 초반: 넓은 범위(이상/이하)
+   - 후반: 실수치
+   ========================================================= */
+
+function createResourceHints(label, value) {
+    const amount = Math.max(0, Number(value) || 0);
+    const hints = [];
+    const step = 50;
+    const exactBoundaryChance = 0.18;
+
+    /*
+      자원 범위 힌트 2개.
+      - 0 이상 / 0 이하는 만들지 않는다.
+      - 이상+이상 / 이하+이하 / 이상+이하 / 이하+이상 모두 가능.
+      - 두 번째 힌트를 적용했을 때의 실제 가능 구간이
+        첫 번째 힌트보다 절대로 넓어지지 않도록 '교집합' 기준으로 선택한다.
+      - 가능하면 두 번째 힌트가 실제 가능 구간을 엄격하게 좁힌다.
+      - 실제값이 경계가 되는 경우는 가능하지만 빈도는 낮춘다.
+    */
+    const lowerBounds = [];
+    const upperBounds = [];
+
+    // 0은 후보에서 제외한다. 경계는 50 단위로 만든다.
+    for (let n = step; n <= amount; n += step) lowerBounds.push(n);
+    for (let n = step; n <= amount + 300; n += step) {
+        if (n >= amount) upperBounds.push(n);
+    }
+
+    // 아주 작은 값도 항상 유효한 상한 후보를 갖도록 한다.
+    if (upperBounds.length === 0) upperBounds.push(step);
+
+    const pick = array => array[Math.floor(Math.random() * array.length)];
+
+    const parseConstraint = text => {
+        const number = Number(text.match(/\d+(?:\.\d+)?/)[0]);
+        return text.endsWith("이상")
+            ? { min: number, max: Infinity }
+            : { min: 0, max: number };
+    };
+
+    const intersect = (a, b) => ({
+        min: Math.max(a.min, b.min),
+        max: Math.min(a.max, b.max)
+    });
+
+    const width = range => {
+        if (!Number.isFinite(range.max)) return Infinity;
+        return Math.max(0, range.max - range.min);
+    };
+
+    const containsAmount = range => range.min <= amount && amount <= range.max;
+
+    const candidates = [];
+
+    // 가능한 모든 두 번째 힌트를 만들어 놓고,
+    // 두 힌트의 교집합이 첫 번째보다 엄격하게 좁아지는 경우만 채택한다.
+    const firstTexts = [
+        ...lowerBounds.map(n => `${n} 이상`),
+        ...upperBounds.filter(n => n > 0).map(n => `${n} 이하`)
+    ];
+    const secondTexts = firstTexts.slice();
+
+    for (const firstText of firstTexts) {
+        const firstRange = parseConstraint(firstText);
+        if (!containsAmount(firstRange)) continue;
+
+        for (const secondText of secondTexts) {
+            const secondRange = parseConstraint(secondText);
+            if (!containsAmount(secondRange)) continue;
+
+            const combined = intersect(firstRange, secondRange);
+            if (combined.min > combined.max || !containsAmount(combined)) continue;
+
+            // 두 번째 조건을 추가했을 때 실제 가능 구간이 엄격하게 좁아져야 한다.
+            const firstWidth = width(firstRange);
+            const combinedWidth = width(combined);
+            const strictlyNarrower =
+                (Number.isFinite(firstWidth) && Number.isFinite(combinedWidth) && combinedWidth < firstWidth) ||
+                (!Number.isFinite(firstWidth) && Number.isFinite(combinedWidth));
+
+            if (!strictlyNarrower) continue;
+
+            // 0 이상/0 이하가 포함된 후보는 제외한다.
+            if (firstText === "0 이상" || firstText === "0 이하" ||
+                secondText === "0 이상" || secondText === "0 이하") continue;
+
+            candidates.push([firstText, secondText]);
+        }
+    }
+
+    // 실제값이 경계로 직접 노출되는 후보를 낮은 확률로만 사용한다.
+    const nonExactCandidates = candidates.filter(pair => {
+        return !pair.some(text => {
+            const number = Number(text.match(/\d+(?:\.\d+)?/)[0]);
+            return number === amount;
+        });
+    });
+
+    let chosen;
+    if (nonExactCandidates.length && Math.random() > exactBoundaryChance) {
+        chosen = pick(nonExactCandidates);
+    } else if (candidates.length) {
+        chosen = pick(candidates);
+    } else {
+        // 안전장치: 후보가 부족한 작은 값에서도 0 이하/0 이상은 만들지 않는다.
+        const firstUpper = Math.max(step, Math.ceil(Math.max(amount, 1) / step) * step + step);
+        const secondUpper = Math.max(step, firstUpper - step);
+        chosen = [
+            `${firstUpper} 이하`,
+            `${secondUpper} 이하`
+        ];
+    }
+
+    hints.push({ key: `${label}_low`, label, value: chosen[0] });
+    hints.push({ key: `${label}_high`, label, value: chosen[1] });
+    hints.push({
+        key: `${label}_exact`,
+        label,
+        value: `${amount}`,
+        late: true
+    });
+
+    return hints;
+}
+
+function createRangeHints(value) {
+    if (value <= 0) {
+        return [{
+            key: "range_none",
+            label: "사거리",
+            value: "없음",
+            notApplicable: true
+        }];
+    }
+
+    return [
+        {
+            key: "range_low",
+            label: "사거리",
+            value: "1 이상"
+        },
+        {
+            key: "range_high",
+            label: "사거리",
+            value: "7 이하"
+        },
+        {
+            key: "range_exact",
+            label: "사거리",
+            value: `${value}`,
+            late: true
+        }
+    ];
+}
+
+function createSpeedHints(value) {
+    if (value === null || value === undefined) {
+        return [
+            {
+                key: "speed_none",
+                label: "이동속도",
+                value: "없음",
+                notApplicable: true
+            }
+        ];
+    }
+
+    // 이동속도는 실제 값의 앞뒤 2.00 정도를 넓은 범위로 사용한다.
+    const low = Math.max(0, Math.floor(value / 2) * 2);
+    const high = low + 2;
+
+    return [
+        {
+            key: "speed_low",
+            label: "이동속도",
+            value: `${low.toFixed(2)} 이상`
+        },
+        {
+            key: "speed_high",
+            label: "이동속도",
+            value: `${high.toFixed(2)} 이하`
+        },
+        {
+            key: "speed_exact",
+            label: "이동속도",
+            value: value.toFixed(2),
+            late: true
+        }
+    ];
+}
+
+
+/* =========================================================
+   힌트 만들기
+   ========================================================= */
+
+function buildHints(unit) {
+    const hints = [];
+
+    // 일반 힌트 10개
+    hints.push({
+        key: "upgrades",
+        label: "전용 업그레이드",
+        value: `${unit.upgrades}개`
+    });
+
+    hints.push({
+        key: "type",
+        label: "분류",
+        value: unit.type
+    });
+
+    hints.push({
+        key: "supply",
+        label: "인구수",
+        value: unit.supply
+    });
+
+    hints.push({
+        key: "armor",
+        label: "기본 방어력",
+        value: unit.armor
+    });
+
+    hints.push({
+        key: "size",
+        label: "크기",
+        value: unit.size
+    });
+
+    hints.push({
+        key: "attack",
+        label: "공격 유형",
+        value: unit.attack,
+        notApplicable: unit.attack === "없음"
+    });
+
+    hints.push({
+        key: "ground",
+        label: "지상 공격",
+        value: unit.ground ? "가능" : "X",
+        notApplicable: !unit.ground
+    });
+
+    hints.push({
+        key: "air",
+        label: "공중 공격",
+        value: unit.air ? "가능" : "X",
+        notApplicable: !unit.air
+    });
+
+    hints.push({
+        key: "tier",
+        label: "티어",
+        value: `Tier ${unit.tier}`
+    });
+
+    hints.push({
+        key: "production",
+        label: "생산 건물",
+        value: unit.production,
+        requiresTier: true,
+        notApplicable: unit.production === "없음"
+    });
+
+    // 범위 8개 + 실수치 4개
+    createResourceHints("미네랄", unit.mineral).forEach(h => hints.push(h));
+    createResourceHints("가스", unit.gas).forEach(h => hints.push(h));
+    createRangeHints(unit.range).forEach(h => hints.push(h));
+    createSpeedHints(unit.speed).forEach(h => hints.push(h));
+
+    return hints;
+}
+
+/* =========================================================
+   힌트 화면 그리기
+   ========================================================= */
+
+function renderHints() {
+    hintsElement.innerHTML = "";
+
+    const totalSlots = 22;
+
+    for (let i = 0; i < totalSlots; i++) {
+        const card = document.createElement("div");
+
+        if (i < revealedHints.length) {
+            const hint = revealedHints[i];
+            card.className = "hint-card revealed";
+
+            const name = document.createElement("div");
+            name.className = "hint-name";
+            name.textContent = hint.label;
+
+            const value = document.createElement("div");
+            value.className = "hint-value";
+            value.textContent = hint.notApplicable ? "X" : hint.value;
+
+            card.appendChild(name);
+            card.appendChild(value);
+        } else {
+            card.className = "hint-card";
+
+            const hidden = document.createElement("div");
+            hidden.className = "hidden-card";
+            hidden.textContent = "?";
+
+            card.appendChild(hidden);
+        }
+
+        hintsElement.appendChild(card);
+    }
+}
+
+
+/* =========================================================
+   다음 힌트 선택
+   ========================================================= */
+
+function getNextHint() {
+    const tierAlreadyRevealed =
+        revealedHints.some(h => h.key === "tier");
+
+    const exactValuesUnlocked = revealedHints.length >= 14;
+
+    let available = hintQueue.filter(h => {
+        if (h.requiresTier && !tierAlreadyRevealed) {
+            return false;
+        }
+
+        // 실수치 힌트는 최소 14개 힌트가 공개된 뒤부터만 선택 가능.
+        if (h.late && !exactValuesUnlocked) {
+            return false;
+        }
+
+        // 실수치는 해당 수치의 범위(이상/이하)가 먼저 공개된 뒤에만 선택한다.
+        if (h.late) {
+            const baseKey = h.key.replace(/_exact$/, "");
+            const lowRevealed = revealedHints.some(x => x.key === `${baseKey}_low`);
+            const highRevealed = revealedHints.some(x => x.key === `${baseKey}_high`);
+            if (!lowRevealed || !highRevealed) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    if (available.length > 0) {
+        return available[
+            Math.floor(Math.random() * available.length)
+        ];
+    }
+
+    /*
+      특정 문제에서 의존 관계 때문에 더 이상 선택 가능한 힌트가
+      없어서 타이머만 반복되는 것을 방지한다.
+      실수치 힌트가 막혀 있다면 먼저 필요한 low/high 힌트를 꺼낸다.
+    */
+    const blockedExact = hintQueue.find(h => h.late);
+    if (blockedExact) {
+        const baseKey = blockedExact.key.replace(/_exact$/, "");
+        const dependency = hintQueue.find(h =>
+            h.key === `${baseKey}_low` || h.key === `${baseKey}_high`
+        );
+        if (dependency) {
+            return dependency;
+        }
+    }
+
+    // 그래도 남은 힌트가 있다면 한 개를 반드시 진행시킨다.
+    return hintQueue[0] || null;
+}
+
+
+/* =========================================================
+   정답 자동 공개
+   ========================================================= */
+
+function scheduleAnswerReveal(delayMs = 10000) {
+    if (answered || settingsOpen) return;
+
+    if (answerRevealTimer) {
+        clearTimeout(answerRevealTimer);
+        answerRevealTimer = null;
+    }
+    if (countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+    }
+
+    const duration = Math.max(0, delayMs);
+    answerRevealAt = Date.now() + duration;
+
+    const updateAnswerRevealCountdown = () => {
+        if (answered || settingsOpen) return;
+        const remaining = Math.max(0, answerRevealAt - Date.now());
+        countdownElement.textContent = (remaining / 1000).toFixed(1);
+    };
+
+    updateAnswerRevealCountdown();
+    countdownTimer = setInterval(updateAnswerRevealCountdown, 50);
+
+    answerRevealTimer = setTimeout(() => {
+        answerRevealTimer = null;
+        answerRevealAt = 0;
+
+        if (countdownTimer) {
+            clearInterval(countdownTimer);
+            countdownTimer = null;
+        }
+
+        if (answered || settingsOpen) return;
+
+        answered = true;
+        answerInput.disabled = true;
+        submitButton.disabled = true;
+        resultElement.textContent = `정답: ${currentUnit.name}`;
+        resultElement.style.color = "#f2c76e";
+        countdownElement.textContent = "정답 공개";
+        nextButton.style.display = "block";
+    }, duration);
+}
+
+/* =========================================================
+   힌트 공개
+   ========================================================= */
+
+function revealNextHint() {
+
+    if (answered) {
+        return;
+    }
+
+    const next = getNextHint();
+
+    if (!next) {
+        return;
+    }
+
+    const index = hintQueue.indexOf(next);
+
+    if (index !== -1) {
+        hintQueue.splice(index, 1);
+    }
+
+    revealedHints.push(next);
+
+    renderHints();
+
+    /*
+      마지막 힌트까지 공개된 경우
+    */
+
+    if (hintQueue.length === 0) {
+        stopTimers();
+        countdownLabelElement.textContent = "정답 공개까지";
+        scheduleAnswerReveal(10000);
+    }
+}
+
+
+/* =========================================================
+   타이머
+   ========================================================= */
+
+function stopTimers() {
+
+    if (timer) {
+        clearInterval(timer);
+        timer = null;
+    }
+
+    if (countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+    }
+}
+
+
+/* =========================================================
+   문제 시작
+   ========================================================= */
+
+function startQuestion() {
+
+    countdownLabelElement.textContent = "다음 힌트";
+    stopTimers();
+    if (answerRevealTimer) {
+        clearTimeout(answerRevealTimer);
+        answerRevealTimer = null;
+    }
+    answerRevealAt = 0;
+    pausedAnswerRevealRemainingMs = null;
+
+    answered = false;
+
+    answerInput.disabled = false;
+    submitButton.disabled = false;
+    nextButton.style.display = "none";
+
+    resultElement.textContent = "";
+
+    answerInput.value = "";
+    answerInput.focus();
+
+    questionNumberElement.textContent = questionNumber;
+    scoreElement.textContent = score;
+
+    currentUnit =
+        units[Math.floor(Math.random() * units.length)];
+
+    const allHints = buildHints(currentUnit);
+
+    hintQueue = shuffle(allHints);
+    revealedHints = [];
+
+    renderHints();
+
+    /*
+      첫 힌트는 즉시 공개
+    */
+
+    revealNextHint();
+
+    startTimers();
+}
+
+
+/* =========================================================
+   정답 확인
+   ========================================================= */
+
+function checkAnswer() {
+
+    if (answered) {
+        return;
+    }
+
+    const input = normalize(answerInput.value);
+
+    if (!input) {
+        return;
+    }
+
+    const correctAnswers = [
+        currentUnit.name,
+        ...currentUnit.aliases
+    ];
+
+    const correct =
+        correctAnswers.some(answer =>
+            normalize(answer) === input
+        );
+
+    if (correct) {
+
+        answered = true;
+
+        if (answerRevealTimer) {
+            clearTimeout(answerRevealTimer);
+            answerRevealTimer = null;
+        }
+        answerRevealAt = 0;
+        pausedAnswerRevealRemainingMs = null;
+        stopTimers();
+
+        /*
+          남은 힌트가 많을수록 높은 점수
+        */
+
+        const bonus =
+            Math.max(0, hintQueue.length) * 50;
+
+        const gained = 100 + bonus;
+
+        score += gained;
+
+        scoreElement.textContent = score;
+
+        resultElement.textContent =
+            `정답! ${currentUnit.name} +${gained}점`;
+
+        resultElement.style.color = "#72d49b";
+
+        answerInput.disabled = true;
+        submitButton.disabled = true;
+
+        /*
+          정답을 맞히면 남은 힌트도 전부 공개
+        */
+
+        while (hintQueue.length > 0) {
+
+            const h = hintQueue.shift();
+
+            revealedHints.push(h);
+        }
+
+        renderHints();
+
+        countdownElement.textContent = "정답";
+
+        nextButton.style.display = "block";
+
+    } else {
+
+        /*
+          오답은 정답 점수와 같은 기준으로 차감:
+          남은 힌트가 많을수록 차감량이 커집니다.
+          음수 점수도 허용합니다.
+        */
+        const penalty =
+            100 + Math.max(0, hintQueue.length) * 50;
+
+        score -= penalty;
+
+        scoreElement.textContent = score;
+
+        resultElement.textContent =
+            `오답입니다. -${penalty}점`;
+
+        resultElement.style.color = "#df7777";
+    }
+}
+
+
+/* =========================================================
+   다음 문제
+   ========================================================= */
+
+function nextQuestion() {
+
+    questionNumber++;
+
+    startQuestion();
+}
+
+
+/* =========================================================
+   이벤트
+   ========================================================= */
+
+submitButton.addEventListener(
+    "click",
+    checkAnswer
+);
+
+nextButton.addEventListener(
+    "click",
+    nextQuestion
+);
+
+answerInput.addEventListener(
+    "keydown",
+    event => {
+
+        if (event.key === "Enter") {
+            checkAnswer();
+        }
+    }
+);
+
+
+/* =========================================================
+   초기 상태
+   ========================================================= */
+
+countdownElement.textContent = "대기";
+setHintInterval(5, false);
+closeCodexOverlay();
+closeCodexDetail();
+
+</script>
+
+</body>
+</html>
